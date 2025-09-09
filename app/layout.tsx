@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Inter, Inter_Tight, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
+import SessionProviderRoot from "@/components/providers/session-provider";
+import { UserMenu } from "@/components/auth/UserMenu";
 import "./globals.css";
 
 const inter = Inter({
@@ -49,11 +51,14 @@ export default function RootLayout({
               <a className="hover:text-foreground" href="#about">About</a>
               <a className="hover:text-foreground" href="/brand">Brand</a>
             </nav>
+            <div className="ml-4"><UserMenu /></div>
           </div>
         </header>
-        <main className="container mx-auto container-page px-4">
-          {children}
-        </main>
+        <SessionProviderRoot>
+          <main className="container mx-auto container-page px-4">
+            {children}
+          </main>
+        </SessionProviderRoot>
         <Analytics />
       </body>
     </html>
