@@ -6,19 +6,392 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider     = "mysql"
+  url          = env("DATABASE_URL")
+  relationMode = "prisma" // PlanetScale: manage relations in Prisma, not DB
 }
 
+// ---------- Enums ----------
+
+enum MembershipRole {
+  MEMBER
+  ADMIN
+}
+
+enum RequestStatus {
+  OPEN
+  BOOKED
+  COMPLETED
+  CANCELLED
+}
+
+enum SlotStatus {
+  OPEN
+  BOOKED
+  COMPLETED
+  CANCELLED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum LedgerType {
+  CREDIT
+  DEBIT
+  FEE
+  ADJUSTMENT
+}
+
+enum CreditLotSource {
+  EARNED
+  PURCHASED
+  BONUS
+  GRANT
+  LOAN
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum LoanStatus {
+  ACTIVE
+  REPAID
+  DEFAULTED
+}
+
+enum ClaimStatus {
+  SUBMITTED
+  APPROVED
+  DENIED
+  PAID
+}
+
+enum DisputeStatus {
+  OPEN
+  RESOLVED
+  REJECTED
+}
+
+// ---------- Models ----------
+
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String  @id @default(cuid()) @db.VarChar(191)
+  email        String  @unique @db.VarChar(191)
   passwordHash String
-  name         String?
-  city         String?
-  avatarSeed   String?
+  name         String? @db.VarChar(191)
+  city         String? @db.VarChar(191)
+  avatarSeed   String? @db.VarChar(191)
   categories   Json?
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  memberships     Membership[]
+  requests        Request[]        @relation("RequestsByUser")
+  bookings        Booking[]        @relation("BookingsByProvider")
+  notifications   Notification[]
+  disputesFiled   Dispute[]        @relation("DisputesFiled")
+  disputesAgainst Dispute[]        @relation("DisputesAgainst")
+  ownedCircles    Circle[]         @relation("CircleOwner")
+  creditLots      CreditLot[]
+  subscriptions   Subscription[]
+  proProfile      ProProfile?
+  loansBorrowed   Loan[]
+  ledgerFrom      LedgerEntry[]    @relation("LedgerFromUser")
+  ledgerTo        LedgerEntry[]    @relation("LedgerToUser")
+  insuranceClaims InsuranceClaim[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Circle {
+  id          String  @id @default(cuid()) @db.VarChar(191)
+  name        String  @db.VarChar(191)
+  description String?
+  city        String? @db.VarChar(191)
+  ownerId     String  @db.VarChar(191)
+  owner       User    @relation("CircleOwner", fields: [ownerId], references: [id])
+
+  memberships   Membership[]
+  requests      Request[]
+  treasury      Treasury?
+  insurance     InsurancePool?
+  ledgerEntries LedgerEntry[]
+  creditLots    CreditLot[]
+  feeRules      FeeRule[]
+  loans         Loan[]
+  disputes      Dispute[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+}
+
+model Membership {
+  id             String         @id @default(cuid()) @db.VarChar(191)
+  userId         String         @db.VarChar(191)
+  circleId       String         @db.VarChar(191)
+  role           MembershipRole @default(MEMBER)
+  balanceCredits Int            @default(0)
+
+  user   User   @relation(fields: [userId], references: [id])
+  circle Circle @relation(fields: [circleId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, circleId])
+  @@index([userId])
+  @@index([circleId])
+}
+
+model Request {
+  id          String        @id @default(cuid()) @db.VarChar(191)
+  circleId    String        @db.VarChar(191)
+  userId      String        @db.VarChar(191) // requester
+  title       String        @db.VarChar(191)
+  description String?
+  status      RequestStatus @default(OPEN)
+
+  circle   Circle    @relation(fields: [circleId], references: [id])
+  user     User      @relation("RequestsByUser", fields: [userId], references: [id])
+  slots    Slot[]
+  bookings Booking[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([circleId])
+  @@index([userId])
+  @@index([status])
+}
+
+model Slot {
+  id        String     @id @default(cuid()) @db.VarChar(191)
+  requestId String     @db.VarChar(191)
+  start     DateTime
+  end       DateTime
+  location  String?    @db.VarChar(191)
+  status    SlotStatus @default(OPEN)
+
+  request  Request   @relation(fields: [requestId], references: [id])
+  bookings Booking[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([requestId])
+  @@index([status])
+}
+
+model Booking {
+  id         String        @id @default(cuid()) @db.VarChar(191)
+  requestId  String        @db.VarChar(191)
+  slotId     String        @db.VarChar(191)
+  providerId String        @db.VarChar(191) // user who fulfills
+  status     BookingStatus @default(PENDING)
+
+  request         Request          @relation(fields: [requestId], references: [id])
+  slot            Slot             @relation(fields: [slotId], references: [id])
+  provider        User             @relation("BookingsByProvider", fields: [providerId], references: [id])
+  ledger          LedgerEntry[]
+  insuranceClaims InsuranceClaim[]
+  disputes        Dispute[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([requestId])
+  @@index([slotId])
+  @@index([providerId])
+  @@index([status])
+}
+
+model LedgerEntry {
+  id         String     @id @default(cuid()) @db.VarChar(191)
+  circleId   String     @db.VarChar(191)
+  bookingId  String?    @db.VarChar(191)
+  fromUserId String?    @db.VarChar(191)
+  toUserId   String?    @db.VarChar(191)
+  amount     Int
+  type       LedgerType
+  meta       Json?
+
+  circle  Circle   @relation(fields: [circleId], references: [id])
+  booking Booking? @relation(fields: [bookingId], references: [id])
+  from    User?    @relation("LedgerFromUser", fields: [fromUserId], references: [id])
+  to      User?    @relation("LedgerToUser", fields: [toUserId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([circleId])
+  @@index([bookingId])
+  @@index([fromUserId])
+  @@index([toUserId])
+}
+
+model CreditLot {
+  id        String          @id @default(cuid()) @db.VarChar(191)
+  userId    String          @db.VarChar(191)
+  circleId  String          @db.VarChar(191)
+  amount    Int
+  remaining Int
+  source    CreditLotSource
+  expiresAt DateTime?
+
+  user   User   @relation(fields: [userId], references: [id])
+  circle Circle @relation(fields: [circleId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([circleId])
+}
+
+model FeeRule {
+  id         String  @id @default(cuid()) @db.VarChar(191)
+  circleId   String  @db.VarChar(191)
+  name       String  @db.VarChar(191)
+  percentBps Int? // basis points, e.g., 250 = 2.5%
+  flatFee    Int? // in credits
+  appliesTo  String? @db.VarChar(191) // e.g., 'booking', 'transfer'
+  active     Boolean @default(true)
+
+  circle Circle @relation(fields: [circleId], references: [id])
+
+  @@index([circleId])
+}
+
+model Subscription {
+  id               String             @id @default(cuid()) @db.VarChar(191)
+  userId           String             @db.VarChar(191)
+  status           SubscriptionStatus @default(ACTIVE)
+  plan             String             @db.VarChar(191)
+  currentPeriodEnd DateTime?
+  stripeCustomerId String?            @db.VarChar(191)
+  stripeSubId      String?            @db.VarChar(191)
+
+  user User @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+model ProProfile {
+  id         String  @id @default(cuid()) @db.VarChar(191)
+  userId     String  @unique @db.VarChar(191)
+  bio        String?
+  skills     Json?
+  hourlyRate Int? // in credits
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Treasury {
+  id              String @id @default(cuid()) @db.VarChar(191)
+  circleId        String @unique @db.VarChar(191)
+  balanceCredits  Int    @default(0)
+  reservedCredits Int    @default(0)
+
+  circle Circle @relation(fields: [circleId], references: [id])
+}
+
+model Loan {
+  id         String     @id @default(cuid()) @db.VarChar(191)
+  circleId   String     @db.VarChar(191)
+  borrowerId String     @db.VarChar(191)
+  principal  Int
+  remaining  Int
+  status     LoanStatus @default(ACTIVE)
+
+  circle   Circle @relation(fields: [circleId], references: [id])
+  borrower User   @relation(fields: [borrowerId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([circleId])
+  @@index([borrowerId])
+  @@index([status])
+}
+
+model InsurancePool {
+  id         String @id @default(cuid()) @db.VarChar(191)
+  circleId   String @unique @db.VarChar(191)
+  balance    Int    @default(0)
+  premiumBps Int? // basis points for premiums
+
+  circle Circle           @relation(fields: [circleId], references: [id])
+  claims InsuranceClaim[]
+}
+
+model InsuranceClaim {
+  id        String      @id @default(cuid()) @db.VarChar(191)
+  poolId    String      @db.VarChar(191)
+  userId    String      @db.VarChar(191)
+  bookingId String?     @db.VarChar(191)
+  amount    Int
+  status    ClaimStatus @default(SUBMITTED)
+  notes     String?
+
+  pool    InsurancePool @relation(fields: [poolId], references: [id])
+  user    User          @relation(fields: [userId], references: [id])
+  booking Booking?      @relation(fields: [bookingId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([poolId])
+  @@index([userId])
+  @@index([status])
+}
+
+model Dispute {
+  id         String        @id @default(cuid()) @db.VarChar(191)
+  circleId   String        @db.VarChar(191)
+  bookingId  String        @db.VarChar(191)
+  filedById  String        @db.VarChar(191)
+  againstId  String        @db.VarChar(191)
+  status     DisputeStatus @default(OPEN)
+  reason     String?
+  resolution String?
+
+  circle  Circle  @relation(fields: [circleId], references: [id])
+  booking Booking @relation(fields: [bookingId], references: [id])
+  filedBy User    @relation("DisputesFiled", fields: [filedById], references: [id])
+  against User    @relation("DisputesAgainst", fields: [againstId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([circleId])
+  @@index([bookingId])
+  @@index([filedById])
+  @@index([againstId])
+  @@index([status])
+}
+
+model Notification {
+  id      String  @id @default(cuid()) @db.VarChar(191)
+  userId  String  @db.VarChar(191)
+  type    String  @db.VarChar(191)
+  read    Boolean @default(false)
+  payload Json?
+
+  user User @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([type])
+  @@index([read])
 }
