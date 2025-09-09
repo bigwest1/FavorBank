@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users, Settings, UserPlus, Shield, Crown, Calendar, MapPin } from "lucide-react";
 import Link from "next/link";
+import { RequestFeed } from "@/components/requests/RequestFeed";
 
 async function getCircle(circleId: string, userId: string) {
   return await prisma.circle.findFirst({
@@ -231,49 +232,7 @@ export default async function CirclePage({ params }: { params: { id: string } })
         </TabsContent>
 
         <TabsContent value="requests">
-          <Card>
-            <CardHeader>
-              <CardTitle>Open Requests</CardTitle>
-              <CardDescription>
-                Help your circle members by browsing and responding to their requests
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {circle.requests.length === 0 ? (
-                <div className="text-center py-12">
-                  <Calendar className="h-16 w-16 mx-auto text-gray-400 mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No Open Requests</h3>
-                  <p className="text-gray-600 mb-6">
-                    Be the first to post a request in this circle!
-                  </p>
-                  <Link href={`/app/circles/${circle.id}/requests/new`}>
-                    <Button>Post a Request</Button>
-                  </Link>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {circle.requests.map((request) => (
-                    <div key={request.id} className="border rounded-lg p-4">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="font-semibold mb-2">{request.title}</h4>
-                          <p className="text-gray-600 text-sm mb-2">
-                            by {request.user.name}
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            Posted {new Date(request.createdAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <Button variant="outline" size="sm">
-                          View Details
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <RequestFeed circleId={circle.id} showCreateButton={true} />
         </TabsContent>
 
         <TabsContent value="members">

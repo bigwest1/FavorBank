@@ -62,6 +62,24 @@ enum LotTier {
   GUARANTEED
 }
 
+enum RequestCategory {
+  HOUSEHOLD_TASKS
+  YARD_WORK
+  PET_CARE
+  CHILD_CARE
+  ELDER_CARE
+  TRANSPORTATION
+  TECH_SUPPORT
+  HOME_REPAIR
+  MOVING_HELP
+  ERRANDS
+  COOKING
+  TUTORING
+  CREATIVE_PROJECTS
+  EVENT_HELP
+  OTHER
+}
+
 enum SubscriptionStatus {
   ACTIVE
   PAST_DUE
@@ -219,8 +237,29 @@ model Request {
   circleId    String        @db.VarChar(191)
   userId      String        @db.VarChar(191) // requester
   title       String        @db.VarChar(191)
-  description String?
+  description String?       @db.Text
   status      RequestStatus @default(OPEN)
+  
+  // New fields for enhanced request system
+  category           RequestCategory
+  photoBase64        String?         @db.LongText // Base64 encoded photo
+  effortLevel        Int             @default(3) // 1-5 scale
+  creditsOffered     Int             // Auto-calculated from effort
+  tier              LotTier         @default(BASIC)
+  
+  // Time constraints  
+  timeWindowStart   DateTime?       // When help is needed (start)
+  timeWindowEnd     DateTime?       // When help is needed (end)
+  expiresAt         DateTime?       // When request expires if not filled
+  
+  // Location
+  locationRadius    Float?          // km radius for in-person help
+  address           String?         @db.VarChar(500) // Optional specific address
+  city              String?         @db.VarChar(191) // City for map markers
+  
+  // Equipment/special requirements
+  equipmentNeeded   Json?           // Array of equipment flags
+  specialRequirements String?       @db.Text
 
   circle   Circle    @relation(fields: [circleId], references: [id])
   user     User      @relation("RequestsByUser", fields: [userId], references: [id])
@@ -233,6 +272,10 @@ model Request {
   @@index([circleId])
   @@index([userId])
   @@index([status])
+  @@index([category])
+  @@index([tier])
+  @@index([city])
+  @@index([expiresAt])
 }
 
 model Slot {
