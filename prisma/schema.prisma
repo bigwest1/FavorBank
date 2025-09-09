@@ -54,6 +54,12 @@ enum CreditLotSource {
   LOAN
 }
 
+enum LotTier {
+  BASIC
+  PRIORITY
+  GUARANTEED
+}
+
 enum SubscriptionStatus {
   ACTIVE
   PAST_DUE
@@ -243,6 +249,7 @@ model CreditLot {
   amount    Int
   remaining Int
   source    CreditLotSource
+  tier      LotTier
   expiresAt DateTime?
 
   user   User   @relation(fields: [userId], references: [id])

@@ -88,7 +88,7 @@ export async function deposit(db: DB, circleId: string, userId: string, amount: 
       amount,
       fromUserId: null,
       toUserId: userId,
-      meta: { kind: "deposit", ...meta, counterparty: "external" },
+      meta: { kind: meta?.kind ?? "deposit", ...meta, counterparty: "external" },
     });
     await bumpMembership(tx, circleId, userId, amount);
   });
@@ -274,4 +274,3 @@ export async function insurancePremium(db: DB, circleId: string, userId: string,
 export async function insurancePayout(db: DB, circleId: string, userId: string, amount: number, meta?: any) {
   return guaranteePoolPayout(db, circleId, userId, amount, { kind: "insurance_payout", ...meta });
 }
-
