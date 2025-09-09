@@ -15,6 +15,8 @@ datasource db {
 
 enum MembershipRole {
   MEMBER
+  MODERATOR
+  OWNER
   ADMIN
 }
 
@@ -110,6 +112,10 @@ model User {
   ledgerFrom      LedgerEntry[]    @relation("LedgerFromUser")
   ledgerTo        LedgerEntry[]    @relation("LedgerToUser")
   insuranceClaims InsuranceClaim[]
+  invitesSent     CircleInvite[]   @relation("CircleInvitesSent")
+  invitesUsed     CircleInvite[]   @relation("CircleInvitesUsed")
+  joinRequests    JoinRequest[]    @relation("JoinRequestsByUser")
+  joinRequestsReviewed JoinRequest[] @relation("JoinRequestsReviewed")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -122,6 +128,15 @@ model Circle {
   city        String? @db.VarChar(191)
   ownerId     String  @db.VarChar(191)
   owner       User    @relation("CircleOwner", fields: [ownerId], references: [id])
+  
+  // Circle settings
+  isPrivate     Boolean @default(false)  // Private = invitation only
+  quietHours    Json?                   // {start: "22:00", end: "07:00"}
+  allowsMinors  Boolean @default(true)
+  demurrageRate Float   @default(0.0)   // % monthly credit decay
+  categories    Json?                   // Enabled categories list
+  invites       CircleInvite[]
+  joinRequests  JoinRequest[]
 
   memberships   Membership[]
   requests      Request[]
@@ -155,6 +170,48 @@ model Membership {
   @@unique([userId, circleId])
   @@index([userId])
   @@index([circleId])
+}
+
+model CircleInvite {
+  id          String    @id @default(cuid()) @db.VarChar(191)
+  circleId    String    @db.VarChar(191)
+  circle      Circle    @relation(fields: [circleId], references: [id])
+  inviterId   String    @db.VarChar(191)
+  inviter     User      @relation("CircleInvitesSent", fields: [inviterId], references: [id])
+  token       String    @unique @db.VarChar(191) // Single-use token
+  email       String?   @db.VarChar(191) // Optional: specific email invite
+  usedById    String?   @db.VarChar(191)
+  usedBy      User?     @relation("CircleInvitesUsed", fields: [usedById], references: [id])
+  usedAt      DateTime?
+  expiresAt   DateTime
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([circleId])
+  @@index([token])
+  @@index([inviterId])
+}
+
+model JoinRequest {
+  id        String   @id @default(cuid()) @db.VarChar(191)
+  circleId  String   @db.VarChar(191)
+  circle    Circle   @relation(fields: [circleId], references: [id])
+  userId    String   @db.VarChar(191)
+  user      User     @relation("JoinRequestsByUser", fields: [userId], references: [id])
+  message   String?  @db.Text
+  status    String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  reviewedBy String? @db.VarChar(191)
+  reviewer   User?   @relation("JoinRequestsReviewed", fields: [reviewedBy], references: [id])
+  reviewedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, circleId])
+  @@index([circleId])
+  @@index([userId])
+  @@index([status])
 }
 
 model Request {

@@ -73,7 +73,7 @@ async function bumpInsurance(tx: DB, circleId: string, delta: number) {
   await tx.insurancePool.update({ where: { circleId }, data: { balance: { increment: delta } } });
 }
 
-function useDb(db?: DB) {
+function getDb(db?: DB) {
   const real = db ?? prisma;
   return {
     $transaction: (fn: (tx: DB) => Promise<any>) => real.$transaction(fn),
@@ -81,7 +81,7 @@ function useDb(db?: DB) {
 }
 
 export async function deposit(db: DB, circleId: string, userId: string, amount: number, meta?: any) {
-  const client = useDb(db);
+  const client = getDb(db);
   return client.$transaction(async (tx: DB) => {
     await addLedgerPair(tx, {
       circleId,
@@ -95,7 +95,7 @@ export async function deposit(db: DB, circleId: string, userId: string, amount: 
 }
 
 export async function earn(db: DB, circleId: string, fromUserId: string, toUserId: string, amount: number, meta?: any) {
-  const client = useDb(db);
+  const client = getDb(db);
   return client.$transaction(async (tx: DB) => {
     await addLedgerPair(tx, {
       circleId,
@@ -110,7 +110,7 @@ export async function earn(db: DB, circleId: string, fromUserId: string, toUserI
 }
 
 export async function spend(db: DB, circleId: string, userId: string, amount: number, meta?: any) {
-  const client = useDb(db);
+  const client = getDb(db);
   return client.$transaction(async (tx: DB) => {
     await addLedgerPair(tx, {
       circleId,
@@ -125,7 +125,7 @@ export async function spend(db: DB, circleId: string, userId: string, amount: nu
 }
 
 export async function applyFee(db: DB, circleId: string, userId: string, amount: number, meta?: any) {
-  const client = useDb(db);
+  const client = getDb(db);
   return client.$transaction(async (tx: DB) => {
     await addLedgerPair(tx, {
       circleId,
@@ -142,7 +142,7 @@ export async function applyFee(db: DB, circleId: string, userId: string, amount:
 }
 
 export async function escrowLock(db: DB, circleId: string, fromUserId: string, amount: number, bookingId: string, meta?: any) {
-  const client = useDb(db);
+  const client = getDb(db);
   return client.$transaction(async (tx: DB) => {
     await addLedgerPair(tx, {
       circleId,
@@ -160,7 +160,7 @@ export async function escrowLock(db: DB, circleId: string, fromUserId: string, a
 }
 
 export async function escrowRelease(db: DB, circleId: string, toUserId: string, amount: number, bookingId: string, meta?: any) {
-  const client = useDb(db);
+  const client = getDb(db);
   return client.$transaction(async (tx: DB) => {
     await addLedgerPair(tx, {
       circleId,
@@ -178,7 +178,7 @@ export async function escrowRelease(db: DB, circleId: string, toUserId: string, 
 }
 
 export async function guaranteePoolFund(db: DB, circleId: string, amount: number, meta?: any) {
-  const client = useDb(db);
+  const client = getDb(db);
   return client.$transaction(async (tx: DB) => {
     await addLedgerPair(tx, {
       circleId,
@@ -195,7 +195,7 @@ export async function guaranteePoolFund(db: DB, circleId: string, amount: number
 }
 
 export async function guaranteePoolPayout(db: DB, circleId: string, userId: string, amount: number, meta?: any) {
-  const client = useDb(db);
+  const client = getDb(db);
   return client.$transaction(async (tx: DB) => {
     await addLedgerPair(tx, {
       circleId,
@@ -212,7 +212,7 @@ export async function guaranteePoolPayout(db: DB, circleId: string, userId: stri
 }
 
 export async function loanIssue(db: DB, circleId: string, borrowerId: string, amount: number, loanId?: string, meta?: any) {
-  const client = useDb(db);
+  const client = getDb(db);
   return client.$transaction(async (tx: DB) => {
     let loan = null as any;
     if (loanId) {
@@ -236,7 +236,7 @@ export async function loanIssue(db: DB, circleId: string, borrowerId: string, am
 }
 
 export async function loanRepay(db: DB, circleId: string, borrowerId: string, amount: number, loanId: string, meta?: any) {
-  const client = useDb(db);
+  const client = getDb(db);
   return client.$transaction(async (tx: DB) => {
     const loan = await tx.loan.update({ where: { id: loanId }, data: { remaining: { decrement: amount } } });
     await addLedgerPair(tx, {
@@ -255,7 +255,7 @@ export async function loanRepay(db: DB, circleId: string, borrowerId: string, am
 }
 
 export async function insurancePremium(db: DB, circleId: string, userId: string, amount: number, meta?: any) {
-  const client = useDb(db);
+  const client = getDb(db);
   return client.$transaction(async (tx: DB) => {
     await addLedgerPair(tx, {
       circleId,

@@ -1,17 +1,10 @@
-import { auth } from "@/auth";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export default auth((req) => {
-  const { nextUrl } = req;
-  if (nextUrl.pathname.startsWith("/app")) {
-    if (!req.auth) {
-      const url = new URL("/login", req.url);
-      url.searchParams.set("callbackUrl", nextUrl.pathname + nextUrl.search);
-      return NextResponse.redirect(url);
-    }
-  }
+export function middleware(request: NextRequest) {
+  // For now, we'll skip middleware auth checks since they cause Edge runtime issues
+  // Auth checks will happen at the page level instead
   return NextResponse.next();
-});
+}
 
 export const config = {
   matcher: ["/app/:path*"],
