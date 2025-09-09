@@ -63,6 +63,8 @@ export default async function AppShellLayout({ children }: { children: ReactNode
           <nav className="container mx-auto container-page px-2 sm:px-4 flex gap-1 overflow-x-auto">
             <NavLink href="/app">Dashboard</NavLink>
             <NavLink href="/app/circles">Circles</NavLink>
+            <NavLink href="/app/slotshop">SlotShop</NavLink>
+            <NavLink href="/app/bookings">Bookings</NavLink>
             <NavLink href="/app/map">Map</NavLink>
             <NavLink href="/app/calendar">Calendar</NavLink>
             <NavLink href="/app/treasury">Treasury</NavLink>

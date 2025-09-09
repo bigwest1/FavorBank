@@ -105,6 +105,13 @@ enum DisputeStatus {
   REJECTED
 }
 
+enum OfferStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
 // ---------- Models ----------
 
 model User {
@@ -119,6 +126,7 @@ model User {
   memberships     Membership[]
   requests        Request[]        @relation("RequestsByUser")
   bookings        Booking[]        @relation("BookingsByProvider")
+  bookedSlots     Booking[]        @relation("BookingsByBooker")
   notifications   Notification[]
   disputesFiled   Dispute[]        @relation("DisputesFiled")
   disputesAgainst Dispute[]        @relation("DisputesAgainst")
@@ -134,6 +142,8 @@ model User {
   invitesUsed     CircleInvite[]   @relation("CircleInvitesUsed")
   joinRequests    JoinRequest[]    @relation("JoinRequestsByUser")
   joinRequestsReviewed JoinRequest[] @relation("JoinRequestsReviewed")
+  offersAsHelper  Offer[]          @relation("OffersAsHelper")
+  slotsAsProvider Slot[]           @relation("SlotsByProvider")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -155,6 +165,7 @@ model Circle {
   categories    Json?                   // Enabled categories list
   invites       CircleInvite[]
   joinRequests  JoinRequest[]
+  slots         Slot[]
 
   memberships   Membership[]
   requests      Request[]
@@ -265,6 +276,7 @@ model Request {
   user     User      @relation("RequestsByUser", fields: [userId], references: [id])
   slots    Slot[]
   bookings Booking[]
+  offers   Offer[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -278,34 +290,88 @@ model Request {
   @@index([expiresAt])
 }
 
+model Offer {
+  id        String      @id @default(cuid()) @db.VarChar(191)
+  requestId String      @db.VarChar(191)
+  helperId  String      @db.VarChar(191)
+  status    OfferStatus @default(PENDING)
+  
+  message          String?   @db.Text // Helper's note
+  proposedStartAt  DateTime? // When helper can start
+  estimatedHours   Float?    // How long helper thinks it will take
+  
+  // Contact info revealed after acceptance
+  helperPhone      String?   @db.VarChar(50)
+  helperEmail      String?   @db.VarChar(191)
+  
+  request Request @relation(fields: [requestId], references: [id])
+  helper  User    @relation("OffersAsHelper", fields: [helperId], references: [id])
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([requestId, helperId]) // One offer per helper per request
+  @@index([requestId])
+  @@index([helperId])
+  @@index([status])
+}
+
 model Slot {
   id        String     @id @default(cuid()) @db.VarChar(191)
-  requestId String     @db.VarChar(191)
+  requestId String?    @db.VarChar(191) // Optional - can be standalone SlotShop slot
+  providerId String    @db.VarChar(191) // User offering availability
+  circleId  String     @db.VarChar(191) // Circle where slot is available
+  
   start     DateTime
   end       DateTime
   location  String?    @db.VarChar(191)
   status    SlotStatus @default(OPEN)
-
-  request  Request   @relation(fields: [requestId], references: [id])
+  
+  // SlotShop specific fields
+  title            String?           @db.VarChar(191)
+  description      String?           @db.Text
+  category         RequestCategory?  // What kind of help offered
+  pricePerMinute   Int              @default(1) // Credits per minute
+  minDuration      Int              @default(5) // Minimum booking duration in minutes
+  maxDuration      Int?             // Maximum booking duration in minutes
+  
+  // Relations
+  request  Request?  @relation(fields: [requestId], references: [id])
+  provider User     @relation("SlotsByProvider", fields: [providerId], references: [id])
+  circle   Circle   @relation(fields: [circleId], references: [id])
   bookings Booking[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([requestId])
+  @@index([providerId])
+  @@index([circleId])
   @@index([status])
+  @@index([start, end]) // For time-based queries
+  @@index([category])
 }
 
 model Booking {
   id         String        @id @default(cuid()) @db.VarChar(191)
-  requestId  String        @db.VarChar(191)
+  requestId  String?       @db.VarChar(191) // Optional - can be standalone slot booking
   slotId     String        @db.VarChar(191)
   providerId String        @db.VarChar(191) // user who fulfills
+  bookerId   String        @db.VarChar(191) // user who books (different from provider)
   status     BookingStatus @default(PENDING)
+  
+  // SlotShop specific fields
+  duration       Int?              // Booked duration in minutes
+  totalCredits   Int?              // Total credits for this booking
+  actualStart    DateTime?         // When the booking actually started
+  actualEnd      DateTime?         // When the booking actually ended
+  bookerNotes    String?           @db.Text // Notes from the booker
+  providerNotes  String?           @db.Text // Notes from the provider
 
-  request         Request          @relation(fields: [requestId], references: [id])
+  request         Request?         @relation(fields: [requestId], references: [id])
   slot            Slot             @relation(fields: [slotId], references: [id])
   provider        User             @relation("BookingsByProvider", fields: [providerId], references: [id])
+  booker          User             @relation("BookingsByBooker", fields: [bookerId], references: [id])
   ledger          LedgerEntry[]
   insuranceClaims InsuranceClaim[]
   disputes        Dispute[]
@@ -316,6 +382,7 @@ model Booking {
   @@index([requestId])
   @@index([slotId])
   @@index([providerId])
+  @@index([bookerId])
   @@index([status])
 }
 

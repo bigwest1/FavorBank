@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
+import { OfferToHelpForm } from "@/components/requests/OfferToHelpForm";
+import { OffersList } from "@/components/requests/OffersList";
 
 async function getRequestDetails(requestId: string, userId: string) {
   return await prisma.request.findFirst({
@@ -157,10 +159,12 @@ export default async function RequestDetailsPage({ params }: { params: { id: str
           
           {canRespond && (
             <div className="ml-4">
-              <Button size="lg">
-                <MessageSquare className="h-4 w-4 mr-2" />
-                Respond to Request
-              </Button>
+              <OfferToHelpForm 
+                requestId={request.id}
+                requestTitle={request.title}
+                timeWindowStart={request.timeWindowStart || undefined}
+                timeWindowEnd={request.timeWindowEnd || undefined}
+              />
             </div>
           )}
         </div>
@@ -226,33 +230,12 @@ export default async function RequestDetailsPage({ params }: { params: { id: str
             </Card>
           )}
 
-          {/* Responses/Bookings */}
-          {request.bookings.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Responses ({request.bookings.length})</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {request.bookings.map((booking: any) => (
-                    <div key={booking.id} className="border rounded-lg p-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-medium">{booking.provider.name}</h4>
-                          <p className="text-sm text-gray-600">
-                            Responded {formatDistanceToNow(new Date(booking.createdAt), { addSuffix: true })}
-                          </p>
-                        </div>
-                        <Badge variant="outline" className={getStatusColor(booking.status)}>
-                          {booking.status}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          {/* Offers */}
+          <OffersList 
+            requestId={request.id}
+            isOwner={isOwner}
+            requestStatus={request.status}
+          />
         </div>
 
         {/* Sidebar */}
@@ -343,10 +326,12 @@ export default async function RequestDetailsPage({ params }: { params: { id: str
               )}
               
               {canRespond && (
-                <Button className="w-full" size="lg">
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  I Can Help
-                </Button>
+                <OfferToHelpForm 
+                  requestId={request.id}
+                  requestTitle={request.title}
+                  timeWindowStart={request.timeWindowStart || undefined}
+                  timeWindowEnd={request.timeWindowEnd || undefined}
+                />
               )}
 
               <Button variant="ghost" className="w-full">

@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 export default async function AppDashboard() {
   const session = await auth();
@@ -68,7 +69,9 @@ export default async function AppDashboard() {
             <p className="text-muted-foreground">Post two 5-minute micro-slots—friends can book and you’ll earn quickly.</p>
           </div>
           <div className="ml-auto">
-            <Button variant="brand">Post a slot</Button>
+            <Link href="/app/slotshop">
+              <Button variant="brand">Visit SlotShop</Button>
+            </Link>
           </div>
         </div>
       </Card>
