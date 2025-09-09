@@ -37,6 +37,7 @@ enum SlotStatus {
 enum BookingStatus {
   PENDING
   CONFIRMED
+  IN_PROGRESS  // Added for check-in state
   COMPLETED
   CANCELLED
 }
@@ -367,6 +368,15 @@ model Booking {
   actualEnd      DateTime?         // When the booking actually ended
   bookerNotes    String?           @db.Text // Notes from the booker
   providerNotes  String?           @db.Text // Notes from the provider
+  
+  // Completion fields
+  completionNotes        String?    @db.Text // Completion notes
+  completionPhotoBase64  String?    @db.LongText // Optional completion photo
+  bookerThanks          String?     @db.Text // Thank you from booker
+  providerThanks        String?     @db.Text // Thank you from provider
+  checkinLatitude       Float?      // Geolocation at check-in
+  checkinLongitude      Float?      // Geolocation at check-in
+  completedAt           DateTime?   // When marked as completed
 
   request         Request?         @relation(fields: [requestId], references: [id])
   slot            Slot             @relation(fields: [slotId], references: [id])

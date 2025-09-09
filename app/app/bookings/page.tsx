@@ -6,10 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-  User, Calendar, MapPin, Clock, Star, CheckCircle, XCircle,
-  Phone, Mail, MessageSquare
+  User, Calendar, MapPin, Clock, CheckCircle, XCircle, Play,
+  Mail, MessageSquare, DollarSign
 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
 import Link from "next/link";
 
 async function getUserBookings(userId: string) {
@@ -30,18 +30,81 @@ async function getUserBookings(userId: string) {
           },
           circle: {
             select: {
+              id: true,
               name: true
             }
           }
         }
+      },
+      slot: {
+        include: {
+          circle: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        }
+      },
+      booker: {
+        select: {
+          id: true,
+          name: true,
+          email: true
+        }
       }
     },
-    orderBy: {
-      createdAt: "desc"
-    }
+    orderBy: [
+      { status: "asc" }, // Show in-progress and confirmed first
+      { createdAt: "desc" }
+    ]
   });
 
-  // Get bookings where user is the requester (getting help)
+  // Get bookings where user is the booker (getting help via SlotShop or requests)
+  const asBooker = await prisma.booking.findMany({
+    where: {
+      bookerId: userId
+    },
+    include: {
+      slot: {
+        include: {
+          provider: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          },
+          circle: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        }
+      },
+      provider: {
+        select: {
+          id: true,
+          name: true,
+          email: true
+        }
+      },
+      request: {
+        select: {
+          id: true,
+          title: true,
+          category: true
+        }
+      }
+    },
+    orderBy: [
+      { status: "asc" }, // Show in-progress and confirmed first
+      { createdAt: "desc" }
+    ]
+  });
+
+  // Also get traditional request-based bookings where user is requester
   const asRequester = await prisma.booking.findMany({
     where: {
       request: {
@@ -60,18 +123,27 @@ async function getUserBookings(userId: string) {
         include: {
           circle: {
             select: {
+              id: true,
               name: true
             }
           }
         }
+      },
+      slot: {
+        select: {
+          id: true,
+          start: true,
+          end: true
+        }
       }
     },
-    orderBy: {
-      createdAt: "desc"
-    }
+    orderBy: [
+      { status: "asc" },
+      { createdAt: "desc" }
+    ]
   });
 
-  return { asProvider, asRequester };
+  return { asProvider, asBooker, asRequester };
 }
 
 function getStatusColor(status: string) {
@@ -79,6 +151,7 @@ function getStatusColor(status: string) {
     case "COMPLETED": return "bg-green-100 text-green-800";
     case "CANCELLED": return "bg-red-100 text-red-800";
     case "CONFIRMED": return "bg-blue-100 text-blue-800";
+    case "IN_PROGRESS": return "bg-purple-100 text-purple-800";
     default: return "bg-orange-100 text-orange-800";
   }
 }
@@ -87,7 +160,15 @@ function getStatusIcon(status: string) {
   switch (status) {
     case "COMPLETED": return <CheckCircle className="h-4 w-4" />;
     case "CANCELLED": return <XCircle className="h-4 w-4" />;
+    case "IN_PROGRESS": return <Play className="h-4 w-4" />;
     default: return <Clock className="h-4 w-4" />;
+  }
+}
+
+function getStatusText(status: string) {
+  switch (status) {
+    case "IN_PROGRESS": return "In Progress";
+    default: return status;
   }
 }
 
@@ -98,29 +179,32 @@ export default async function BookingsPage() {
     redirect("/login");
   }
 
-  const { asProvider, asRequester } = await getUserBookings(session.user.id);
+  const { asProvider, asBooker, asRequester } = await getUserBookings(session.user.id);
+  
+  // Combine asBooker and asRequester for "Getting Help" tab
+  const allGettingHelp = [...asBooker, ...asRequester];
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      <div className="mb-8">
-        <h1 className="text-h2 font-bold">My Bookings</h1>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">My Bookings</h1>
         <p className="text-gray-600 mt-2">
-          Manage your active and past favor exchanges
+          Manage your active and completed sessions
         </p>
       </div>
 
-      <Tabs defaultValue="helping" className="space-y-6">
+      <Tabs defaultValue="providing" className="space-y-6">
         <TabsList>
-          <TabsTrigger value="helping">
-            Helping Others ({asProvider.length})
+          <TabsTrigger value="providing">
+            Providing Help ({asProvider.length})
           </TabsTrigger>
-          <TabsTrigger value="getting-help">
-            Getting Help ({asRequester.length})
+          <TabsTrigger value="getting">
+            Getting Help ({allGettingHelp.length})
           </TabsTrigger>
         </TabsList>
 
-        {/* Bookings where user is helping others */}
-        <TabsContent value="helping">
+        {/* Bookings where user is providing help */}
+        <TabsContent value="providing">
           {asProvider.length === 0 ? (
             <Card className="text-center py-12">
               <CardContent>
@@ -129,11 +213,16 @@ export default async function BookingsPage() {
                   <div>
                     <h3 className="text-lg font-semibold mb-2">No Active Help Sessions</h3>
                     <p className="text-gray-600 mb-4">
-                      You haven&apos;t offered to help anyone yet. Browse requests in your circles to get started!
+                      You haven&apos;t offered to help anyone yet. Publish availability or respond to requests!
                     </p>
-                    <Link href="/app/circles">
-                      <Button>Browse Circles</Button>
-                    </Link>
+                    <div className="flex gap-2 justify-center">
+                      <Link href="/app/slotshop">
+                        <Button>Publish Availability</Button>
+                      </Link>
+                      <Link href="/app/circles">
+                        <Button variant="outline">Browse Requests</Button>
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -145,52 +234,65 @@ export default async function BookingsPage() {
                   <CardHeader>
                     <div className="flex justify-between items-start">
                       <div>
-                        <CardTitle className="text-lg">
-                          <Link 
-                            href={`/app/requests/${booking.request.id}`}
-                            className="hover:underline"
-                          >
-                            {booking.request.title}
-                          </Link>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          {booking.request ? booking.request.title : booking.slot.title}
+                          {booking.status === "IN_PROGRESS" && (
+                            <Badge variant="secondary" className="bg-purple-100 text-purple-800">
+                              Live Session
+                            </Badge>
+                          )}
                         </CardTitle>
                         <CardDescription className="mt-1">
-                          Helping {booking.request.user.name} in {booking.request.circle.name}
+                          Helping {booking.booker?.name || booking.request?.user?.name} in{" "}
+                          {booking.slot?.circle?.name || booking.request?.circle?.name}
                         </CardDescription>
                       </div>
-                      <Badge 
-                        variant="secondary" 
-                        className={`${getStatusColor(booking.status)} flex items-center gap-1`}
-                      >
-                        {getStatusIcon(booking.status)}
-                        {booking.status}
-                      </Badge>
+                      <div className="text-right">
+                        <Badge 
+                          variant="secondary" 
+                          className={`${getStatusColor(booking.status)} flex items-center gap-1 mb-1`}
+                        >
+                          {getStatusIcon(booking.status)}
+                          {getStatusText(booking.status)}
+                        </Badge>
+                        {booking.totalCredits && (
+                          <div className="text-sm text-green-700 font-medium">
+                            +{booking.totalCredits} credits
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      <p className="text-gray-700 text-sm line-clamp-2">
-                        {booking.request.description}
-                      </p>
-                      
-                      <div className="flex items-center gap-4 text-sm text-gray-600">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4" />
-                          <span>{formatDistanceToNow(new Date(booking.createdAt), { addSuffix: true })}</span>
+                      {/* Show slot time for SlotShop bookings */}
+                      {booking.slot && (
+                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-4 w-4" />
+                            <span>{format(new Date(booking.slot.start), "MMM d, h:mm a")}</span>
+                          </div>
+                          {booking.duration && (
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-4 w-4" />
+                              <span>{booking.duration} minutes</span>
+                            </div>
+                          )}
                         </div>
-                        <Badge variant="outline" className="bg-green-100 text-green-800">
-                          {booking.request.creditsOffered} credits
-                        </Badge>
-                      </div>
+                      )}
 
-                      {/* Contact info for requester */}
-                      {booking.status === "CONFIRMED" && (
-                        <div className="bg-blue-50 border border-blue-200 p-3 rounded mt-3">
+                      {/* Contact info for confirmed bookings */}
+                      {booking.status === "CONFIRMED" && (booking.booker || booking.request?.user) && (
+                        <div className="bg-blue-50 border border-blue-200 p-3 rounded">
                           <div className="text-sm font-medium text-blue-800 mb-2">Contact Information:</div>
                           <div className="space-y-1 text-sm text-blue-700">
                             <div className="flex items-center gap-2">
                               <Mail className="h-3 w-3" />
-                              <a href={`mailto:${booking.request.user.email}`} className="hover:underline">
-                                {booking.request.user.email}
+                              <a 
+                                href={`mailto:${booking.booker?.email || booking.request?.user?.email}`} 
+                                className="hover:underline"
+                              >
+                                {booking.booker?.email || booking.request?.user?.email}
                               </a>
                             </div>
                           </div>
@@ -198,16 +300,17 @@ export default async function BookingsPage() {
                       )}
 
                       <div className="flex gap-2 pt-2">
-                        <Link href={`/app/requests/${booking.request.id}`}>
+                        <Link href={`/app/bookings/${booking.id}`}>
                           <Button variant="outline" size="sm">
-                            View Request
+                            {booking.status === "IN_PROGRESS" ? "Manage Session" : "View Details"}
                           </Button>
                         </Link>
-                        {booking.status === "CONFIRMED" && (
-                          <Button variant="outline" size="sm">
-                            <MessageSquare className="h-4 w-4 mr-1" />
-                            Contact
-                          </Button>
+                        {booking.request && (
+                          <Link href={`/app/requests/${booking.request.id}`}>
+                            <Button variant="outline" size="sm">
+                              View Request
+                            </Button>
+                          </Link>
                         )}
                       </div>
                     </div>
@@ -219,73 +322,93 @@ export default async function BookingsPage() {
         </TabsContent>
 
         {/* Bookings where user is getting help */}
-        <TabsContent value="getting-help">
-          {asRequester.length === 0 ? (
+        <TabsContent value="getting">
+          {allGettingHelp.length === 0 ? (
             <Card className="text-center py-12">
               <CardContent>
                 <div className="space-y-4">
                   <div className="text-6xl">📝</div>
                   <div>
-                    <h3 className="text-lg font-semibold mb-2">No Requests with Bookings</h3>
+                    <h3 className="text-lg font-semibold mb-2">No Booked Sessions</h3>
                     <p className="text-gray-600 mb-4">
-                      You haven&apos;t had any requests accepted yet. Post a request to get started!
+                      You haven&apos;t booked any sessions yet. Browse available slots or post a request!
                     </p>
-                    <Link href="/app/circles">
-                      <Button>Post a Request</Button>
-                    </Link>
+                    <div className="flex gap-2 justify-center">
+                      <Link href="/app/slotshop">
+                        <Button>Browse SlotShop</Button>
+                      </Link>
+                      <Link href="/app/circles">
+                        <Button variant="outline">Post Request</Button>
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
           ) : (
             <div className="space-y-4">
-              {asRequester.map((booking: any) => (
+              {allGettingHelp.map((booking: any) => (
                 <Card key={booking.id} className="hover:shadow-md transition-shadow">
                   <CardHeader>
                     <div className="flex justify-between items-start">
                       <div>
-                        <CardTitle className="text-lg">
-                          <Link 
-                            href={`/app/requests/${booking.request.id}`}
-                            className="hover:underline"
-                          >
-                            {booking.request.title}
-                          </Link>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          {booking.request?.title || booking.slot?.title}
+                          {booking.status === "IN_PROGRESS" && (
+                            <Badge variant="secondary" className="bg-purple-100 text-purple-800">
+                              Live Session
+                            </Badge>
+                          )}
                         </CardTitle>
                         <CardDescription className="mt-1">
-                          {booking.provider.name} is helping you in {booking.request.circle.name}
+                          {booking.provider.name} is helping you in{" "}
+                          {booking.slot?.circle?.name || booking.request?.circle?.name}
                         </CardDescription>
                       </div>
-                      <Badge 
-                        variant="secondary" 
-                        className={`${getStatusColor(booking.status)} flex items-center gap-1`}
-                      >
-                        {getStatusIcon(booking.status)}
-                        {booking.status}
-                      </Badge>
+                      <div className="text-right">
+                        <Badge 
+                          variant="secondary" 
+                          className={`${getStatusColor(booking.status)} flex items-center gap-1 mb-1`}
+                        >
+                          {getStatusIcon(booking.status)}
+                          {getStatusText(booking.status)}
+                        </Badge>
+                        {booking.totalCredits && (
+                          <div className="text-sm text-red-700 font-medium">
+                            -{booking.totalCredits} credits
+                          </div>
+                        )}
+                        {booking.request?.creditsOffered && (
+                          <div className="text-sm text-red-700 font-medium">
+                            -{booking.request.creditsOffered} credits
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-3">
-                      <p className="text-gray-700 text-sm line-clamp-2">
-                        {booking.request.description}
-                      </p>
-                      
-                      <div className="flex items-center gap-4 text-sm text-gray-600">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4" />
-                          <span>{formatDistanceToNow(new Date(booking.createdAt), { addSuffix: true })}</span>
+                      {/* Show slot time for SlotShop bookings */}
+                      {booking.slot && (
+                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-4 w-4" />
+                            <span>{format(new Date(booking.slot.start), "MMM d, h:mm a")}</span>
+                          </div>
+                          {booking.duration && (
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-4 w-4" />
+                              <span>{booking.duration} minutes</span>
+                            </div>
+                          )}
                         </div>
-                        <Badge variant="outline" className="bg-green-100 text-green-800">
-                          {booking.request.creditsOffered} credits
-                        </Badge>
-                      </div>
+                      )}
 
                       {/* Helper contact info */}
                       {booking.status === "CONFIRMED" && (
-                        <div className="bg-green-50 border border-green-200 p-3 rounded mt-3">
+                        <div className="bg-green-50 border border-green-200 p-3 rounded">
                           <div className="text-sm font-medium text-green-800 mb-2">
-                            Helper Contact Information:
+                            Provider Contact Information:
                           </div>
                           <div className="space-y-1 text-sm text-green-700">
                             <div className="flex items-center gap-2">
@@ -299,16 +422,17 @@ export default async function BookingsPage() {
                       )}
 
                       <div className="flex gap-2 pt-2">
-                        <Link href={`/app/requests/${booking.request.id}`}>
+                        <Link href={`/app/bookings/${booking.id}`}>
                           <Button variant="outline" size="sm">
-                            View Request
+                            {booking.status === "IN_PROGRESS" ? "Manage Session" : "View Details"}
                           </Button>
                         </Link>
-                        {booking.status === "CONFIRMED" && (
-                          <Button variant="outline" size="sm">
-                            <MessageSquare className="h-4 w-4 mr-1" />
-                            Contact Helper
-                          </Button>
+                        {booking.request && (
+                          <Link href={`/app/requests/${booking.request.id}`}>
+                            <Button variant="outline" size="sm">
+                              View Request
+                            </Button>
+                          </Link>
                         )}
                       </div>
                     </div>
