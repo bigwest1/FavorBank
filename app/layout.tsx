@@ -47,6 +47,7 @@ export default function RootLayout({
               <a className="hover:text-foreground" href="#features">Features</a>
               <a className="hover:text-foreground" href="#pricing">Pricing</a>
               <a className="hover:text-foreground" href="#about">About</a>
+              <a className="hover:text-foreground" href="/brand">Brand</a>
             </nav>
           </div>
         </header>

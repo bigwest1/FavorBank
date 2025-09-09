@@ -1,5 +1,12 @@
 /* Design tokens for FavorBank */
 :root {
+  /* Palette */
+  --ink: #1F2430;
+  --leaf-42a: #46C079;
+  --citrus: #F7C948;
+  --cloud: #F7F9FC;
+  --clay: #E7E3DC;
+
   /* Brand */
   --brand-50: #eef7ff;
   --brand-100: #d8ecff;
@@ -33,6 +40,20 @@
   --space-4: 16px;
   --space-5: 20px;
   --space-6: 24px;
+
+  /* Type scale (size/line-height in px) */
+  --type-display-size: 56px;
+  --type-display-line: 64px;
+  --type-h1-size: 40px;
+  --type-h1-line: 48px;
+  --type-h2-size: 32px;
+  --type-h2-line: 40px;
+  --type-h3-size: 24px;
+  --type-h3-line: 32px;
+  --type-body-size: 16px;
+  --type-body-line: 24px;
+  --type-small-size: 14px;
+  --type-small-line: 20px;
 }
 
 @media (prefers-color-scheme: light) {
@@ -46,3 +67,75 @@
   }
 }
 
+/* Typography utility classes */
+.text-display {
+  font-family: var(--font-inter-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--type-display-size);
+  line-height: var(--type-display-line);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.text-h1 {
+  font-family: var(--font-inter-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--type-h1-size);
+  line-height: var(--type-h1-line);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.text-h2 {
+  font-family: var(--font-inter-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--type-h2-size);
+  line-height: var(--type-h2-line);
+  font-weight: 650;
+}
+
+.text-h3 {
+  font-family: var(--font-inter-display), ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--type-h3-size);
+  line-height: var(--type-h3-line);
+  font-weight: 650;
+}
+
+.text-body {
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+}
+
+.text-small {
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--type-small-size);
+  line-height: var(--type-small-line);
+}
+
+/* Motion: springy chip */
+@keyframes spring-pop {
+  0% { transform: scale(0.98); }
+  40% { transform: scale(1.05); }
+  70% { transform: scale(0.995); }
+  100% { transform: scale(1); }
+}
+
+.springy:hover {
+  animation: spring-pop 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.springy:active {
+  transform: scale(0.97);
+}
+
+/* Motion: breathing marker */
+@keyframes breathe {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(70, 192, 121, 0.45); }
+  50% { transform: scale(1.04); box-shadow: 0 0 0 10px rgba(70, 192, 121, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(70, 192, 121, 0); }
+}
+
+.breathing-marker {
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: var(--leaf-42a);
+  animation: breathe 2000ms ease-in-out infinite;
+}
