@@ -1,0 +1,48 @@
+/* Design tokens for FavorBank */
+:root {
+  /* Brand */
+  --brand-50: #eef7ff;
+  --brand-100: #d8ecff;
+  --brand-200: #b9dbff;
+  --brand-300: #8dc3ff;
+  --brand-400: #5ea6ff;
+  --brand-500: #2f87ff;
+  --brand-600: #0f6cf0;
+  --brand-700: #0956c2;
+  --brand-800: #083f8d;
+  --brand-900: #072e66;
+
+  /* Semantic */
+  --bg: #0b0b0c;
+  --bg-elevated: #111214;
+  --bg-muted: #17181b;
+  --fg: #e7e7ea;
+  --fg-muted: #a9abb3;
+  --border: #26272b;
+  --ring: var(--brand-500);
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #ffffff;
+    --bg-elevated: #f7f7f9;
+    --bg-muted: #f2f4f7;
+    --fg: #0f1115;
+    --fg-muted: #475467;
+    --border: #e5e7eb;
+  }
+}
+
