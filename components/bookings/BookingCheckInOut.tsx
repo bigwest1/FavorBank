@@ -572,108 +572,109 @@ export function BookingCheckInOut({ booking, currentUserId, onBookingUpdate }: B
             )}
 
             {/* Thank You Messages */}
-            {isCompleted && (
-              <div className="space-y-3">
-                {/* Show existing thanks */}
-                {(booking.bookerThanks || booking.providerThanks) && (
-                  <div className="bg-pink-50 p-3 rounded-lg">
-                    <div className="text-sm font-medium text-pink-800 mb-2">
-                      <Heart className="h-4 w-4 inline mr-1" />
-                      Thank You Messages
+            {(() => {
+              if (!isCompleted) return null;
+              const showThanks = (isProvider && !booking.providerThanks) || (isBooker && !booking.bookerThanks);
+              return (
+                <div className="space-y-3">
+                  { (booking.bookerThanks || booking.providerThanks) ? (
+                    <div className="bg-pink-50 p-3 rounded-lg">
+                      <div className="text-sm font-medium text-pink-800 mb-2">
+                        <Heart className="h-4 w-4 inline mr-1" />
+                        Thank You Messages
+                      </div>
+                      {booking.bookerThanks && (
+                        <div className="text-sm text-pink-700">
+                          <strong>{booking.booker.name}:</strong> {booking.bookerThanks}
+                        </div>
+                      )}
+                      {booking.providerThanks && (
+                        <div className="text-sm text-pink-700 mt-1">
+                          <strong>{booking.provider.name}:</strong> {booking.providerThanks}
+                        </div>
+                      )}
                     </div>
-                    {booking.bookerThanks && (
-                      <div className="text-sm text-pink-700">
-                        <strong>{booking.booker.name}:</strong> {booking.bookerThanks}
-                      </div>
-                    )}
-                    {booking.providerThanks && (
-                      <div className="text-sm text-pink-700 mt-1">
-                        <strong>{booking.provider.name}:</strong> {booking.providerThanks}
-                      </div>
-                    )}
-                  </div>
-                )}
+                  ) : null}
 
-                {/* Review Action */}
-                <div className="flex gap-2">
-                  <Dialog open={showReviewDialog} onOpenChange={setShowReviewDialog}>
-                    <DialogTrigger asChild>
-                      <Button variant="default" size="sm" className="bg-yellow-500 hover:bg-yellow-600 text-white">
-                        <Sparkles className="h-4 w-4 mr-2" />
-                        Share positive feedback
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-2xl">
-                      <DialogHeader>
-                        <DialogTitle>Share Positive Feedback</DialogTitle>
-                        <DialogDescription>
-                          Help build trust in your circle by highlighting what made this session great
-                        </DialogDescription>
-                      </DialogHeader>
-                      <TraitsSelector
-                        revieweeName={isProvider ? booking.booker.name : booking.provider.name}
-                        selectedTraits={selectedTraits}
-                        onTraitsChange={setSelectedTraits}
-                        note={reviewNote}
-                        onNoteChange={setReviewNote}
-                        onSubmit={handleSubmitReview}
-                        isSubmitting={isSubmittingReview}
-                      />
-                    </DialogContent>
-                  </Dialog>
-
-                  {/* Leave thanks button */}
-                  {((isProvider && !booking.providerThanks) || (isBooker && !booking.bookerThanks)) && (
-                  <Dialog open={showThanksDialog} onOpenChange={setShowThanksDialog}>
-                    <DialogTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        <Heart className="h-4 w-4 mr-2" />
-                        Leave Thank You
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Leave a Thank You</DialogTitle>
-                        <DialogDescription>
-                          Share your appreciation with {isProvider ? booking.booker.name : booking.provider.name}
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <Textarea
-                          placeholder={`Thank ${isProvider ? booking.booker.name : booking.provider.name} for the session...`}
-                          value={thanksMessage}
-                          onChange={(e) => setThanksMessage(e.target.value)}
-                          maxLength={200}
+                  {/* Review Action */}
+                  <div className="flex gap-2">
+                    <Dialog open={showReviewDialog} onOpenChange={setShowReviewDialog}>
+                      <DialogTrigger asChild>
+                        <Button variant="default" size="sm" className="bg-yellow-500 hover:bg-yellow-600 text-white">
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          Share positive feedback
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                          <DialogTitle>Share Positive Feedback</DialogTitle>
+                          <DialogDescription>
+                            Help build trust in your circle by highlighting what made this session great
+                          </DialogDescription>
+                        </DialogHeader>
+                        <TraitsSelector
+                          revieweeName={isProvider ? booking.booker.name : booking.provider.name}
+                          selectedTraits={selectedTraits}
+                          onTraitsChange={setSelectedTraits}
+                          note={reviewNote}
+                          onNoteChange={setReviewNote}
+                          onSubmit={handleSubmitReview}
+                          isSubmitting={isSubmittingReview}
                         />
-                        <div className="text-xs text-gray-500 text-right">
-                          {thanksMessage.length}/200
-                        </div>
-                        <div className="flex gap-3">
-                          <Button 
-                            variant="outline" 
-                            onClick={() => {
-                              setShowThanksDialog(false);
-                              setThanksMessage("");
-                            }}
-                            className="flex-1"
-                          >
-                            Cancel
-                          </Button>
-                          <Button 
-                            onClick={handleLeaveThanks}
-                            disabled={isLeavingThanks || !thanksMessage.trim()}
-                            className="flex-1"
-                          >
+                      </DialogContent>
+                    </Dialog>
+
+                    {/* Leave thanks button */}
+                    {showThanks ? (
+                      <Dialog open={showThanksDialog} onOpenChange={setShowThanksDialog}>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm">
                             <Heart className="h-4 w-4 mr-2" />
-                            {isLeavingThanks ? "Sending..." : "Send Thanks"}
+                            Leave Thank You
                           </Button>
-                        </div>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                )}
-              </div>
-            )}
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Leave a Thank You</DialogTitle>
+                            <DialogDescription>
+                              Share your appreciation with {isProvider ? booking.booker.name : booking.provider.name}
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <Textarea
+                              placeholder={`Thank ${isProvider ? booking.booker.name : booking.provider.name} for the session...`}
+                              value={thanksMessage}
+                              onChange={(e) => setThanksMessage(e.target.value)}
+                              maxLength={200}
+                            />
+                            <div className="text-xs text-gray-500 text-right">
+                              {thanksMessage.length}/200
+                            </div>
+                            <div className="flex gap-3">
+                              <Button 
+                                variant="outline" 
+                                onClick={() => { setShowThanksDialog(false); setThanksMessage(""); }}
+                                className="flex-1"
+                              >
+                                Cancel
+                              </Button>
+                              <Button 
+                                onClick={handleLeaveThanks}
+                                disabled={isLeavingThanks || !thanksMessage.trim()}
+                                className="flex-1"
+                              >
+                                <Heart className="h-4 w-4 mr-2" />
+                                {isLeavingThanks ? "Sending..." : "Send Thanks"}
+                              </Button>
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </CardContent>
       </Card>
