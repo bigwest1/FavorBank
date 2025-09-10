@@ -1,10 +1,5 @@
 {
   "crons": [
-    { "path": "/api/cron/expire", "schedule": "*/30 * * * *" },
-    { "path": "/api/cron/loan-repay", "schedule": "0 8 * * *" },
-    { "path": "/api/cron/disputes-auto", "schedule": "0 * * * *" },
-    { "path": "/api/cron/pro-payout", "schedule": "0 9 * * 1" },
-    { "path": "/api/cron/demurrage", "schedule": "0 7 1 * *" }
+    { "path": "/api/cron/daily", "schedule": "0 7 * * *" }
   ]
 }
-
