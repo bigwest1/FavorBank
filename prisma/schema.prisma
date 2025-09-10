@@ -42,6 +42,15 @@ enum BookingStatus {
   CANCELLED
 }
 
+enum UserTrait {
+  RELIABLE
+  CAREFUL
+  CHEERFUL
+  HELPFUL
+  RESPONSIVE
+  FRIENDLY
+}
+
 enum LedgerType {
   CREDIT
   DEBIT
@@ -145,6 +154,8 @@ model User {
   joinRequestsReviewed JoinRequest[] @relation("JoinRequestsReviewed")
   offersAsHelper  Offer[]          @relation("OffersAsHelper")
   slotsAsProvider Slot[]           @relation("SlotsByProvider")
+  reviewsGiven    Review[]         @relation("ReviewsGiven")
+  reviewsReceived Review[]         @relation("ReviewsReceived")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -177,6 +188,7 @@ model Circle {
   feeRules      FeeRule[]
   loans         Loan[]
   disputes      Dispute[]
+  reviews       Review[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -385,6 +397,7 @@ model Booking {
   ledger          LedgerEntry[]
   insuranceClaims InsuranceClaim[]
   disputes        Dispute[]
+  reviews         Review[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -578,4 +591,29 @@ model Notification {
   @@index([userId])
   @@index([type])
   @@index([read])
+}
+
+model Review {
+  id         String      @id @default(cuid()) @db.VarChar(191)
+  bookingId  String      @db.VarChar(191)
+  reviewerId String      @db.VarChar(191) // person leaving the review
+  revieweeId String      @db.VarChar(191) // person being reviewed
+  circleId   String      @db.VarChar(191)
+  
+  // Positive traits only - no ratings, just tags
+  traits     UserTrait[]  // Array of positive traits selected
+  note       String?      @db.Text // Optional positive note
+  
+  booking   Booking @relation(fields: [bookingId], references: [id])
+  reviewer  User    @relation("ReviewsGiven", fields: [reviewerId], references: [id])
+  reviewee  User    @relation("ReviewsReceived", fields: [revieweeId], references: [id])
+  circle    Circle  @relation(fields: [circleId], references: [id])
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([bookingId, reviewerId]) // One review per booking per reviewer
+  @@index([revieweeId])
+  @@index([circleId])
+  @@index([createdAt])
 }

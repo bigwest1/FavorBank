@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { ReciprocityMeter } from "@/components/reciprocity/ReciprocityMeter";
 
 export default async function AppDashboard() {
   const session = await auth();
@@ -22,12 +23,15 @@ export default async function AppDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <Card className="p-6">
           <div className="text-sm text-muted-foreground">Total credits</div>
           <div className="mt-2 text-h1">{balance}</div>
           <p className="mt-2 text-sm text-muted-foreground">Tip: Post your first 2 micro-slots—5 minutes each.</p>
         </Card>
+        
+        {/* Reciprocity Meter - Compact */}
+        <ReciprocityMeter userId={userId!} compact={true} />
         <Card className="p-6 md:col-span-2">
           <div className="flex items-center justify-between">
             <h2 className="text-h3">Recent activity</h2>

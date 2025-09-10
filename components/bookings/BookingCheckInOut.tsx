@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import { format } from "date-fns";
 import confetti from "canvas-confetti";
+import { TraitsSelector } from "@/components/reviews/TraitsSelector";
 
 interface Booking {
   id: string;
@@ -68,6 +69,10 @@ export function BookingCheckInOut({ booking, currentUserId, onBookingUpdate }: B
   const [thanksMessage, setThanksMessage] = useState("");
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
   const [showThanksDialog, setShowThanksDialog] = useState(false);
+  const [showReviewDialog, setShowReviewDialog] = useState(false);
+  const [selectedTraits, setSelectedTraits] = useState<string[]>([]);
+  const [reviewNote, setReviewNote] = useState("");
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   const isProvider = currentUserId === booking.providerId;
   const isBooker = currentUserId === booking.bookerId;
@@ -264,6 +269,46 @@ export function BookingCheckInOut({ booking, currentUserId, onBookingUpdate }: B
       toast.error(error.message || "Failed to send thank you");
     } finally {
       setIsLeavingThanks(false);
+    }
+  };
+
+  const handleSubmitReview = async () => {
+    if (selectedTraits.length === 0) {
+      toast.error("Please select at least one positive trait");
+      return;
+    }
+
+    setIsSubmittingReview(true);
+    try {
+      const response = await fetch(`/api/bookings/${booking.id}/review`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          traits: selectedTraits,
+          note: reviewNote.trim() || undefined
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to submit review");
+      }
+
+      const result = await response.json();
+      toast.success(result.message);
+      setShowReviewDialog(false);
+      setSelectedTraits([]);
+      setReviewNote("");
+      
+      if (onBookingUpdate) {
+        onBookingUpdate(booking); // Refresh booking data
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to submit review");
+    } finally {
+      setIsSubmittingReview(false);
     }
   };
 
@@ -518,8 +563,36 @@ export function BookingCheckInOut({ booking, currentUserId, onBookingUpdate }: B
                   </div>
                 )}
 
-                {/* Leave thanks button */}
-                {((isProvider && !booking.providerThanks) || (isBooker && !booking.bookerThanks)) && (
+                {/* Review Action */}
+                <div className="flex gap-2">
+                  <Dialog open={showReviewDialog} onOpenChange={setShowReviewDialog}>
+                    <DialogTrigger asChild>
+                      <Button variant="default" size="sm" className="bg-yellow-500 hover:bg-yellow-600 text-white">
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Share positive feedback
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl">
+                      <DialogHeader>
+                        <DialogTitle>Share Positive Feedback</DialogTitle>
+                        <DialogDescription>
+                          Help build trust in your circle by highlighting what made this session great
+                        </DialogDescription>
+                      </DialogHeader>
+                      <TraitsSelector
+                        revieweeName={isProvider ? booking.booker.name : booking.provider.name}
+                        selectedTraits={selectedTraits}
+                        onTraitsChange={setSelectedTraits}
+                        note={reviewNote}
+                        onNoteChange={setReviewNote}
+                        onSubmit={handleSubmitReview}
+                        isSubmitting={isSubmittingReview}
+                      />
+                    </DialogContent>
+                  </Dialog>
+
+                  {/* Leave thanks button */}
+                  {((isProvider && !booking.providerThanks) || (isBooker && !booking.bookerThanks)) && (
                   <Dialog open={showThanksDialog} onOpenChange={setShowThanksDialog}>
                     <DialogTrigger asChild>
                       <Button variant="outline" size="sm">
