@@ -5,6 +5,7 @@ import SessionProviderRoot from "@/components/providers/session-provider";
 import { UserMenu } from "@/components/auth/UserMenu";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
+import { I18nProvider, defaultDict } from "@/lib/i18n";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -56,9 +57,11 @@ export default function RootLayout({
           </div>
         </header>
         <SessionProviderRoot>
-          <main className="container mx-auto container-page px-4">
-            {children}
-          </main>
+          <I18nProvider dict={defaultDict}>
+            <main className="container mx-auto container-page px-4">
+              {children}
+            </main>
+          </I18nProvider>
         </SessionProviderRoot>
         <Toaster position="top-right" richColors />
         <Analytics />

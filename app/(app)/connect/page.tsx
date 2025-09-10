@@ -181,10 +181,10 @@ export default function PublicGoodPage() {
 
       {selected && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setSelected(null)}>
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full overflow-hidden" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full overflow-hidden" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="connect-booking-title">
             <div className="border-b px-4 py-3 flex items-center justify-between">
-              <div className="font-medium">Book: {selected.title || selected.category}</div>
-              <button className="text-sm text-gray-500" onClick={() => setSelected(null)}>Close</button>
+              <div id="connect-booking-title" className="font-medium">Book: {selected.title || selected.category}</div>
+              <button className="text-sm text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background" onClick={() => setSelected(null)} aria-label="Close dialog">Close</button>
             </div>
             <div className="p-4">
               {/* BookingForm posts to the booking API. Public Good fee handled server-side via isPublicGood flag. */}

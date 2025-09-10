@@ -59,6 +59,11 @@ export function BookingForm({ slot, onSuccess, onCancel, isPublicGood = false }:
   const [businessSubscription, setBusinessSubscription] = useState<any>(null);
   
   const [feeCalculation, setFeeCalculation] = useState<any>(null);
+  
+  // Safety checklist for heavy categories
+  const HEAVY_CATEGORIES = new Set(["MOVING", "FURNITURE", "MAINTENANCE"]);
+  const requiresSafety = HEAVY_CATEGORIES.has(slot.category);
+  const [safetyChecked, setSafetyChecked] = useState(false);
 
   // Calculate slot duration and cost
   const slotDuration = Math.round(
@@ -153,6 +158,10 @@ export function BookingForm({ slot, onSuccess, onCancel, isPublicGood = false }:
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (requiresSafety && !safetyChecked) {
+      toast.error("Please acknowledge the safety checklist first");
+      return;
+    }
     setLoading(true);
 
     try {
@@ -516,11 +525,33 @@ export function BookingForm({ slot, onSuccess, onCancel, isPublicGood = false }:
         </Card>
       )}
 
+      {/* Safety Checklist for Heavy Categories */}
+      {requiresSafety && (
+        <Card className="border-amber-300 bg-amber-50">
+          <CardHeader>
+            <CardTitle className="text-amber-900">Safety Checklist</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-amber-900">
+            <p>Before booking, please confirm:</p>
+            <ul className="list-disc ml-5 space-y-1">
+              <li>Clear pathways and remove tripping hazards</li>
+              <li>Lift with your legs; avoid twisting while carrying</li>
+              <li>Use gloves or proper equipment when needed</li>
+              <li>Two-person carry for heavy/awkward items</li>
+            </ul>
+            <div className="flex items-center gap-2 pt-1">
+              <Checkbox id="safetyAck" checked={safetyChecked} onCheckedChange={(v) => setSafetyChecked(!!v)} />
+              <Label htmlFor="safetyAck">I understand and will follow these safety practices</Label>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Actions */}
       <div className="flex gap-3">
         <Button 
           type="submit" 
-          disabled={loading}
+          disabled={loading || (requiresSafety && !safetyChecked)}
           className="flex-1"
         >
           {loading ? (

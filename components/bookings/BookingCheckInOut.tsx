@@ -8,9 +8,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import {
+import { 
   Play, Square, Clock, MapPin, User, Camera,
-  CheckCircle, Heart, Sparkles, AlertCircle
+  CheckCircle, Heart, Sparkles, AlertCircle, Siren
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -124,6 +124,21 @@ export function BookingCheckInOut({ booking, currentUserId, onBookingUpdate }: B
         maximumAge: 60000
       });
     });
+  };
+
+  const handleSOS = async () => {
+    try {
+      const pos = await requestGeolocation();
+      const res = await fetch(`/api/bookings/${booking.id}/sos`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to send SOS');
+      toast.success(`SOS sent to ${data.sent} circle admin(s)`);
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to send SOS');
+    }
   };
 
   const handleCheckIn = async () => {
@@ -516,6 +531,13 @@ export function BookingCheckInOut({ booking, currentUserId, onBookingUpdate }: B
                     </div>
                   </DialogContent>
                 </Dialog>
+              )}
+
+              {/* SOS Button */}
+              {(inProgress || canStart) && (
+                <Button type="button" variant="destructive" onClick={handleSOS} aria-label="Send SOS to circle admins">
+                  <Siren className="h-4 w-4 mr-2" /> SOS
+                </Button>
               )}
             </div>
 

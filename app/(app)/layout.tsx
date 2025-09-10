@@ -30,8 +30,9 @@ export default async function AppShellLayout({ children }: { children: ReactNode
     <Link
       href={href}
       className={cn(
-        "px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent"
+        "px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       )}
+      aria-label={typeof children === 'string' ? (children as string) : undefined}
     >
       {children}
     </Link>
@@ -64,7 +65,7 @@ export default async function AppShellLayout({ children }: { children: ReactNode
           </div>
         </div>
         <div className="border-t">
-          <nav className="container mx-auto container-page px-2 sm:px-4 flex gap-1 overflow-x-auto">
+          <nav className="container mx-auto container-page px-2 sm:px-4 flex gap-1 overflow-x-auto" aria-label="Main navigation">
             <NavLink href="/app">Dashboard</NavLink>
             <NavLink href="/app/circles">Circles</NavLink>
             <NavLink href="/app/slotshop">SlotShop</NavLink>
