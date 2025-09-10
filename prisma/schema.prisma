@@ -195,6 +195,11 @@ model User {
   businessSubscription BusinessSubscription?
   businessExpenses     BusinessExpense[]
   
+  // Tool library & errands relations
+  toolLoans            ToolLoan[]
+  errandBundlesCreated ErrandBundle[]
+  errandItemsRequested ErrandItem[]
+  
   // Notifications
   notifications       Notification[]
   notificationPrefs   NotificationPreference[]
@@ -228,6 +233,10 @@ model Circle {
   // Tool library and errands
   tools            Tool[]
   errands          ErrandBundle[]
+  toolLoans        ToolLoan[]
+  
+  // Notification preferences
+  notificationPrefs NotificationPreference[]
 
   @@index([ownerId])
   @@map("circles")
