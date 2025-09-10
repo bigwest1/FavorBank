@@ -41,7 +41,7 @@ interface BookingFormProps {
   onCancel?: () => void;
 }
 
-export function BookingForm({ slot, onSuccess, onCancel }: BookingFormProps) {
+export function BookingForm({ slot, onSuccess, onCancel, isPublicGood = false }: BookingFormProps & { isPublicGood?: boolean }) {
   const [duration, setDuration] = useState(slot.minDuration);
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
@@ -120,8 +120,28 @@ export function BookingForm({ slot, onSuccess, onCancel }: BookingFormProps) {
     };
 
     const calculation = FeesContext.calculateFees(baseAmount, bookingContext);
-    const breakdown = FeesContext.getFeeBreakdown(calculation);
+    const breakdown = FeesContext.getFeeBreakdown(calculation) as any;
     
+    // Add Public Good community fee for display
+    if (isPublicGood) {
+      const pgAmount = Math.floor(baseAmount * 0.15);
+      breakdown.fees = [
+        ...breakdown.fees,
+        {
+          id: 'public_good',
+          name: 'Public Good',
+          icon: '🤝',
+          description: 'Community fee for city-wide favors',
+          percentage: 15,
+          amount: pgAmount,
+          displayText: '🤝 Public Good +15%'
+        }
+      ];
+      breakdown.totalSurcharge += pgAmount;
+      breakdown.totalPercentage = Math.round((breakdown.totalSurcharge / baseAmount) * 100);
+      breakdown.finalAmount += pgAmount;
+    }
+
     // Add insurance cost if selected
     if (wantInsurance && isInsuranceEligible()) {
       breakdown.insuranceCost = 2;
@@ -154,7 +174,9 @@ export function BookingForm({ slot, onSuccess, onCancel }: BookingFormProps) {
           wantInsurance,
           // Business expense data
           isBusinessExpense: isBusinessExpense && isBusinessExpenseEligible(),
-          businessMemo: isBusinessExpense ? businessMemo : undefined
+          businessMemo: isBusinessExpense ? businessMemo : undefined,
+          // Mark Public Good bookings
+          isPublicGood
         })
       });
 

@@ -220,6 +220,10 @@ model Circle {
   treasury         CircleTreasury? // One-to-one with treasury
   loans            Loan[]          // FavorLoans issued in this circle
   loanEligibilities LoanEligibility[] // Loan eligibility assessments
+  
+  // Tool library and errands
+  tools            Tool[]
+  errands          ErrandBundle[]
 
   @@index([ownerId])
   @@map("circles")
@@ -309,6 +313,119 @@ model Booking {
   @@index([status])
   @@index([isGuaranteed]) // New index for guaranteed bookings
   @@map("bookings")
+}
+
+// ==========================================
+// TOOL LIBRARY & BUNDLED ERRANDS
+// ==========================================
+
+enum ToolStatus {
+  AVAILABLE
+  BORROWED
+  MAINTENANCE
+  RETIRED
+}
+
+model Tool {
+  id             String     @id @default(cuid())
+  circleId       String
+  name           String
+  description    String?    @db.Text
+  photoBase64    String?
+  status         ToolStatus @default(AVAILABLE)
+  feePerBorrow   Int        @default(1) // Credits charged per borrow
+  depositCredits Int?       // Optional refundable deposit
+  qrToken        String?    // For quick check-in/out URLs
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  circle         Circle     @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  loans          ToolLoan[]
+
+  @@index([circleId])
+  @@index([status])
+  @@map("tools")
+}
+
+enum ToolLoanStatus {
+  ACTIVE
+  RETURNED
+  OVERDUE
+}
+
+model ToolLoan {
+  id           String         @id @default(cuid())
+  toolId       String
+  circleId     String
+  borrowerId   String
+  startAt      DateTime       @default(now())
+  dueAt        DateTime?
+  returnedAt   DateTime?
+  status       ToolLoanStatus @default(ACTIVE)
+  feeCharged   Int            @default(0)
+  notes        String?        @db.Text
+
+  tool         Tool           @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  circle       Circle         @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  borrower     User           @relation(fields: [borrowerId], references: [id], onDelete: Cascade)
+
+  @@index([toolId])
+  @@index([circleId])
+  @@index([borrowerId])
+  @@index([status])
+  @@map("tool_loans")
+}
+
+enum ErrandBundleStatus {
+  OPEN
+  CLOSED
+  COMPLETED
+}
+
+model ErrandBundle {
+  id           String              @id @default(cuid())
+  circleId     String
+  creatorId    String
+  title        String              // e.g., Costco run
+  departAt     DateTime
+  location     String?
+  notes        String?             @db.Text
+  status       ErrandBundleStatus  @default(OPEN)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  circle       Circle              @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  creator      User                @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  items        ErrandItem[]
+
+  @@index([circleId])
+  @@index([status])
+  @@map("errand_bundles")
+}
+
+enum ErrandItemStatus {
+  PENDING
+  ADDED
+  COMPLETED
+  CANCELLED
+}
+
+model ErrandItem {
+  id          String           @id @default(cuid())
+  bundleId    String
+  requesterId String
+  description String
+  quantity    Int              @default(1)
+  tipCredits  Int              @default(1) // 1–2 credits suggested
+  status      ErrandItemStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+
+  bundle      ErrandBundle     @relation(fields: [bundleId], references: [id], onDelete: Cascade)
+  requester   User             @relation(fields: [requesterId], references: [id], onDelete: Cascade)
+
+  @@index([bundleId])
+  @@index([requesterId])
+  @@map("errand_items")
 }
 
 model LedgerEntry {

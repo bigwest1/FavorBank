@@ -64,6 +64,7 @@ export default async function AppShellLayout({ children }: { children: ReactNode
             <NavLink href="/app">Dashboard</NavLink>
             <NavLink href="/app/circles">Circles</NavLink>
             <NavLink href="/app/slotshop">SlotShop</NavLink>
+            <NavLink href="/app/connect">Public Good</NavLink>
             <NavLink href="/app/bookings">Bookings</NavLink>
             <NavLink href="/app/map">Map</NavLink>
             <NavLink href="/app/calendar">Calendar</NavLink>
@@ -76,4 +77,3 @@ export default async function AppShellLayout({ children }: { children: ReactNode
     </div>
   );
 }
-

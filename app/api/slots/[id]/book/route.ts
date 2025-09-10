@@ -17,7 +17,8 @@ const BookSlotSchema = z.object({
   }).optional(),
   wantInsurance: z.boolean().optional(),
   isBusinessExpense: z.boolean().optional(),
-  businessMemo: z.string().optional()
+  businessMemo: z.string().optional(),
+  isPublicGood: z.boolean().optional()
 });
 
 export async function POST(
@@ -125,7 +126,34 @@ export async function POST(
       circleId: slot.circleId
     };
 
-    const feeCalculation = FeesContext.calculateFees(baseCredits, bookingContext);
+    let feeCalculation = FeesContext.calculateFees(baseCredits, bookingContext);
+
+    // Apply Public Good 15% community fee when booking via connect tab
+    if (data.isPublicGood) {
+      const publicFeePercent = 15;
+      const publicFeeAmount = Math.floor(baseCredits * (publicFeePercent / 100));
+      const maxFeeAmount = Math.floor(baseCredits * (FeesContext.getMaxFeePercentage() / 100));
+      const remainingCap = Math.max(0, maxFeeAmount - feeCalculation.totalSurchargeAmount);
+      const appliedPgAmount = Math.min(publicFeeAmount, remainingCap);
+
+      if (appliedPgAmount > 0) {
+        // extend applied fees
+        (feeCalculation.appliedFees as any).push({
+          rule: { id: 'public_good', name: 'Public Good', description: 'Community fee for city-wide favors', percentage: publicFeePercent, icon: '🤝', priority: 0 },
+          percentage: publicFeePercent,
+          amount: appliedPgAmount,
+          description: `Public Good (+${publicFeePercent}%): Community fee for city-wide favors`
+        });
+        feeCalculation.totalSurchargeAmount += appliedPgAmount;
+        feeCalculation.totalSurchargePercentage = Math.round((feeCalculation.totalSurchargeAmount / baseCredits) * 100);
+        feeCalculation.finalAmount = baseCredits + feeCalculation.totalSurchargeAmount;
+        const wasCapped = appliedPgAmount < publicFeeAmount;
+        feeCalculation.capped = feeCalculation.capped || wasCapped;
+        if (wasCapped) {
+          feeCalculation.capReason = `Total fees capped at ${FeesContext.getMaxFeePercentage()}%`;
+        }
+      }
+    }
     
     // Check if insurance is requested and eligible
     const isInsuranceEligible = slot.category === "MOVING" || slot.category === "FURNITURE";
@@ -170,7 +198,7 @@ export async function POST(
           transactionType: "booking" as const,
           feeBreakdown: {
             baseAmount: baseCredits,
-            fees: feeCalculation.appliedFees.map(fee => ({
+            fees: (feeCalculation.appliedFees as any).map((fee: any) => ({
               id: fee.rule.id,
               name: fee.rule.name,
               percentage: fee.percentage,

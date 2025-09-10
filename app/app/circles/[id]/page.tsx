@@ -5,9 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Settings, UserPlus, Shield, Crown, Calendar, MapPin } from "lucide-react";
+import { Users, Settings, UserPlus, Shield, Crown, Calendar, MapPin, Wrench } from "lucide-react";
 import Link from "next/link";
 import { RequestFeed } from "@/components/requests/RequestFeed";
+import dynamic from "next/dynamic";
+
+const ToolLibrary = dynamic(() => import("@/components/tools/ToolLibrary"), { ssr: false });
+const ErrandsBoard = dynamic(() => import("@/components/errands/ErrandsBoard"), { ssr: false });
 
 async function getCircle(circleId: string, userId: string) {
   return await prisma.circle.findFirst({
@@ -171,6 +175,8 @@ export default async function CirclePage({ params }: { params: { id: string } })
           <TabsTrigger value="members">
             Members ({circle.memberships.length})
           </TabsTrigger>
+          <TabsTrigger value="tools">Tools</TabsTrigger>
+          <TabsTrigger value="errands">Errands</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="grid gap-6 md:grid-cols-2">
@@ -267,6 +273,32 @@ export default async function CirclePage({ params }: { params: { id: string } })
                   </div>
                 ))}
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="tools">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wrench className="h-5 w-5" />
+                Tool Library
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {/* Client component handles fetching and interactions */}
+              <ToolLibrary circleId={circle.id} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="errands">
+          <Card>
+            <CardHeader>
+              <CardTitle>Bundled Errands</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ErrandsBoard circleId={circle.id} />
             </CardContent>
           </Card>
         </TabsContent>
