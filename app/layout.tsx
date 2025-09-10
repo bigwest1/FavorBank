@@ -61,6 +61,19 @@ export default function RootLayout({
             <main className="container mx-auto container-page px-4">
               {children}
             </main>
+            <footer className="border-t mt-12">
+              <div className="container mx-auto container-page px-4 py-8 text-sm text-muted-foreground grid gap-4 md:grid-cols-2">
+                <div>
+                  <div className="font-medium text-foreground mb-2">FavorBank</div>
+                  <p className="max-w-prose">A friendly, community-driven time exchange. Credits are for coordinating help — not cash.</p>
+                </div>
+                <nav className="flex flex-wrap gap-4 items-start justify-start md:justify-end" aria-label="Legal">
+                  <a className="hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background" href="/legal/terms">Terms</a>
+                  <a className="hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background" href="/legal/privacy">Privacy</a>
+                  <a className="hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background" href="/legal/house-rules">House Rules</a>
+                </nav>
+              </div>
+            </footer>
           </I18nProvider>
         </SessionProviderRoot>
         <Toaster position="top-right" richColors />
