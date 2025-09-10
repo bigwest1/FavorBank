@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { 
   Play, Square, Clock, MapPin, User, Camera,
-  CheckCircle, Heart, Sparkles, AlertCircle, Siren
+  CheckCircle, Heart, Sparkles, AlertCircle, AlertTriangle
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -536,7 +536,7 @@ export function BookingCheckInOut({ booking, currentUserId, onBookingUpdate }: B
               {/* SOS Button */}
               {(inProgress || canStart) && (
                 <Button type="button" variant="destructive" onClick={handleSOS} aria-label="Send SOS to circle admins">
-                  <Siren className="h-4 w-4 mr-2" /> SOS
+                  <AlertTriangle className="h-4 w-4 mr-2" /> SOS
                 </Button>
               )}
             </div>

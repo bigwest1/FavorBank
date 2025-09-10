@@ -7,9 +7,7 @@ import { Bell, CircleDollarSign } from "lucide-react";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/sonner";
-import dynamic from "next/dynamic";
-
-const NotificationsToaster = dynamic(() => import("@/components/notifications/NotificationsToaster"), { ssr: false });
+import NotificationsToaster from "@/components/notifications/NotificationsToaster";
 
 export default async function AppShellLayout({ children }: { children: ReactNode }) {
   const session = await auth();

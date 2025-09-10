@@ -8,11 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Users, Settings, UserPlus, Shield, Crown, Calendar, MapPin, Wrench, BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { RequestFeed } from "@/components/requests/RequestFeed";
-import dynamic from "next/dynamic";
-
-const ToolLibrary = dynamic(() => import("@/components/tools/ToolLibrary"), { ssr: false });
-const ErrandsBoard = dynamic(() => import("@/components/errands/ErrandsBoard"), { ssr: false });
-const CircleImpact = dynamic(() => import("@/components/impact/CircleImpact"), { ssr: false });
+import ToolLibrary from "@/components/tools/ToolLibrary";
+import ErrandsBoard from "@/components/errands/ErrandsBoard";
+import CircleImpact from "@/components/impact/CircleImpact";
 
 async function getCircle(circleId: string, userId: string) {
   return await prisma.circle.findFirst({
