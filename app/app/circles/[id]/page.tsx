@@ -5,13 +5,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Settings, UserPlus, Shield, Crown, Calendar, MapPin, Wrench } from "lucide-react";
+import { Users, Settings, UserPlus, Shield, Crown, Calendar, MapPin, Wrench, BarChart3 } from "lucide-react";
 import Link from "next/link";
 import { RequestFeed } from "@/components/requests/RequestFeed";
 import dynamic from "next/dynamic";
 
 const ToolLibrary = dynamic(() => import("@/components/tools/ToolLibrary"), { ssr: false });
 const ErrandsBoard = dynamic(() => import("@/components/errands/ErrandsBoard"), { ssr: false });
+const CircleImpact = dynamic(() => import("@/components/impact/CircleImpact"), { ssr: false });
 
 async function getCircle(circleId: string, userId: string) {
   return await prisma.circle.findFirst({
@@ -177,6 +178,7 @@ export default async function CirclePage({ params }: { params: { id: string } })
           </TabsTrigger>
           <TabsTrigger value="tools">Tools</TabsTrigger>
           <TabsTrigger value="errands">Errands</TabsTrigger>
+          <TabsTrigger value="impact">Impact</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="grid gap-6 md:grid-cols-2">
@@ -299,6 +301,20 @@ export default async function CirclePage({ params }: { params: { id: string } })
             </CardHeader>
             <CardContent>
               <ErrandsBoard circleId={circle.id} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="impact">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Impact Dashboard
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <CircleImpact circleId={circle.id} circleName={circle.name} />
             </CardContent>
           </Card>
         </TabsContent>
