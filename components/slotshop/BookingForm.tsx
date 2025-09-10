@@ -53,6 +53,11 @@ export function BookingForm({ slot, onSuccess, onCancel }: BookingFormProps) {
   const [crossCircle, setCrossCircle] = useState(false);
   const [wantInsurance, setWantInsurance] = useState(false);
   
+  // Business expense state
+  const [isBusinessExpense, setIsBusinessExpense] = useState(false);
+  const [businessMemo, setBusinessMemo] = useState("");
+  const [businessSubscription, setBusinessSubscription] = useState<any>(null);
+  
   const [feeCalculation, setFeeCalculation] = useState<any>(null);
 
   // Calculate slot duration and cost
@@ -62,10 +67,33 @@ export function BookingForm({ slot, onSuccess, onCancel }: BookingFormProps) {
   const maxBookingDuration = slot.maxDuration ? Math.min(slot.maxDuration, slotDuration) : slotDuration;
   const baseAmount = duration * slot.pricePerMinute;
 
+  // Load business subscription on mount
+  useEffect(() => {
+    fetchBusinessSubscription();
+  }, []);
+  
   // Calculate fees whenever options change
   useEffect(() => {
     calculateFees();
   }, [duration, isUrgent, needsEquipment, isGuaranteed, crossCircle, wantInsurance]);
+
+  const fetchBusinessSubscription = async () => {
+    try {
+      const response = await fetch('/api/business/subscription');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.subscription?.status === 'ACTIVE') {
+          setBusinessSubscription(data.subscription);
+          // Pre-fill memo with default if available
+          if (data.subscription.defaultMemo && !businessMemo) {
+            setBusinessMemo(data.subscription.defaultMemo);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching business subscription:', error);
+    }
+  };
 
   const calculateFees = () => {
     const now = new Date();
@@ -123,7 +151,10 @@ export function BookingForm({ slot, onSuccess, onCancel }: BookingFormProps) {
             isGuaranteed,
             crossCircle
           },
-          wantInsurance
+          wantInsurance,
+          // Business expense data
+          isBusinessExpense: isBusinessExpense && isBusinessExpenseEligible(),
+          businessMemo: isBusinessExpense ? businessMemo : undefined
         })
       });
 
@@ -165,6 +196,12 @@ export function BookingForm({ slot, onSuccess, onCancel }: BookingFormProps) {
 
   const isInsuranceEligible = () => {
     return slot.category === "MOVING" || slot.category === "FURNITURE";
+  };
+
+  const isBusinessExpenseEligible = () => {
+    if (!businessSubscription) return false;
+    const enabledCategories = businessSubscription.enabledCategories || [];
+    return enabledCategories.includes(slot.category);
   };
 
   return (
@@ -361,6 +398,61 @@ export function BookingForm({ slot, onSuccess, onCancel }: BookingFormProps) {
                 </div>
               </div>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Business Expense Tagging */}
+      {isBusinessExpenseEligible() && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-blue-800">
+              <DollarSign className="h-5 w-5" />
+              Business Expense
+              <Badge variant="secondary" className="bg-blue-100 text-blue-700">
+                Tax Deductible
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-start space-x-3">
+              <Checkbox
+                id="businessExpense"
+                checked={isBusinessExpense}
+                onCheckedChange={(checked) => setIsBusinessExpense(checked as boolean)}
+              />
+              <div className="flex-1">
+                <Label htmlFor="businessExpense" className="text-base font-medium text-blue-800">
+                  Tag as business expense
+                </Label>
+                <p className="text-sm text-blue-700 mt-1">
+                  This booking will be included in your monthly business expense reports.
+                </p>
+                {businessSubscription && (
+                  <p className="text-xs text-blue-600 mt-1">
+                    Company: {businessSubscription.companyName}
+                  </p>
+                )}
+              </div>
+            </div>
+            
+            {isBusinessExpense && (
+              <div className="space-y-2">
+                <Label htmlFor="businessMemo">Business memo (required for export)</Label>
+                <Textarea
+                  id="businessMemo"
+                  placeholder="e.g., Client meeting setup, office cleaning, equipment transport..."
+                  value={businessMemo}
+                  onChange={(e) => setBusinessMemo(e.target.value)}
+                  maxLength={500}
+                  className="h-20"
+                  required={isBusinessExpense}
+                />
+                <p className="text-xs text-blue-600">
+                  Estimated value: ${((duration * slot.pricePerMinute) * 0.10).toFixed(2)}
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

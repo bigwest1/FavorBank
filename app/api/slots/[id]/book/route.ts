@@ -15,7 +15,9 @@ const BookSlotSchema = z.object({
     isGuaranteed: z.boolean().optional(),
     crossCircle: z.boolean().optional()
   }).optional(),
-  wantInsurance: z.boolean().optional()
+  wantInsurance: z.boolean().optional(),
+  isBusinessExpense: z.boolean().optional(),
+  businessMemo: z.string().optional()
 });
 
 export async function POST(
@@ -192,6 +194,41 @@ export async function POST(
           category: slot.category,
           coverageAmount: 500 // Up to $500 coverage
         });
+      }
+
+      // Process business expense if tagged
+      if (data.isBusinessExpense && data.businessMemo) {
+        // Get user's business subscription
+        const businessSubscription = await tx.businessSubscription.findFirst({
+          where: { 
+            userId: session.user!.id,
+            status: "ACTIVE"
+          }
+        });
+
+        if (businessSubscription) {
+          // Check if category is enabled
+          const enabledCategories = businessSubscription.enabledCategories as string[];
+          if (enabledCategories.includes(slot.category)) {
+            // Create business expense entry
+            const dollarValue = totalCredits * 0.10; // $0.10 per credit estimate
+            
+            await tx.businessExpense.create({
+              data: {
+                bookingId: booking.id,
+                userId: session.user!.id,
+                subscriptionId: businessSubscription.id,
+                isBusinessExpense: true,
+                memo: data.businessMemo,
+                category: slot.category,
+                tags: [],
+                creditValue: totalCredits,
+                dollarValue,
+                taxDeductible: true
+              }
+            });
+          }
+        }
       }
 
       // Escrow lock the credits (including fees)

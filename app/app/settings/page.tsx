@@ -10,8 +10,12 @@ import { Separator } from "@/components/ui/separator";
 import { PlusBadge, PlusStatus } from "@/components/plus/PlusBadge";
 import { 
   User, Crown, CreditCard, Calendar, Shield,
-  Settings, Bell, Lock, Palette
+  Settings, Bell, Lock, Palette, Briefcase, Download, FileText
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 interface PlusDetails {
   isActive: boolean;
@@ -74,9 +78,10 @@ export default function SettingsPage() {
       </div>
 
       <Tabs defaultValue="account" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="account">Account</TabsTrigger>
           <TabsTrigger value="plus">Plus</TabsTrigger>
+          <TabsTrigger value="business">Business</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
           <TabsTrigger value="privacy">Privacy</TabsTrigger>
         </TabsList>
@@ -250,6 +255,11 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
+        {/* Business Tab */}
+        <TabsContent value="business" className="space-y-6">
+          <BusinessSettings />
+        </TabsContent>
+
         {/* Notifications Tab */}
         <TabsContent value="notifications" className="space-y-6">
           <Card>
@@ -287,5 +297,258 @@ export default function SettingsPage() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function BusinessSettings() {
+  const { data: session } = useSession();
+  const user = session?.user;
+
+  const [loading, setLoading] = useState(true);
+  const [sub, setSub] = useState<any | null>(null);
+  const [businessCategories, setBusinessCategories] = useState<string[]>([]);
+  const [companyName, setCompanyName] = useState("");
+  const [defaultMemo, setDefaultMemo] = useState("");
+  const [enabledCategories, setEnabledCategories] = useState<string[]>([]);
+
+  const [exportMonth, setExportMonth] = useState<string>(() => new Date().toISOString().slice(0, 7));
+  const [exportFormat, setExportFormat] = useState<"csv" | "pdf" | "concur" | "expensify">("csv");
+  const [exporting, setExporting] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    setLoading(true);
+    fetch('/api/business/subscription')
+      .then(async (res) => {
+        if (!res.ok) throw new Error('Failed to load subscription');
+        return res.json();
+      })
+      .then((data) => {
+        setSub(data.subscription);
+        setBusinessCategories(data.businessCategories || []);
+        if (data.subscription) {
+          setCompanyName(data.subscription.companyName || "");
+          setDefaultMemo(data.subscription.defaultMemo || "");
+          setEnabledCategories(data.subscription.enabledCategories || []);
+        }
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [user?.id]);
+
+  const toggleCategory = (cat: string) => {
+    setEnabledCategories((prev) => 
+      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
+    );
+  };
+
+  const createSubscription = async () => {
+    if (!companyName || enabledCategories.length === 0) return;
+    setLoading(true);
+    try {
+      const res = await fetch('/api/business/subscription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyName, enabledCategories, defaultMemo })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to enable business kit');
+      setSub(data.subscription);
+    } catch (e) {
+      console.error(e);
+      alert((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateSubscription = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/business/subscription', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ companyName, enabledCategories, defaultMemo })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update subscription');
+      setSub({ ...sub, ...data.subscription });
+    } catch (e) {
+      console.error(e);
+      alert((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      if (exportFormat === 'csv') {
+        const res = await fetch('/api/business/export', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ format: 'csv', month: exportMonth, includeDetails: true })
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || 'Export failed');
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `business-expenses-${exportMonth}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } else {
+        const res = await fetch('/api/business/export', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ format: exportFormat, month: exportMonth, includeDetails: true })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Export failed');
+        // Download JSON stub
+        const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `business-expenses-${exportMonth}-${exportFormat}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+    } catch (e) {
+      console.error(e);
+      alert((e as Error).message);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  if (!user) return <div>Please log in to view settings.</div>;
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Briefcase className="h-5 w-5" />
+            Business Expense Kit
+            <Badge variant="secondary" className="ml-2">$199/year</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {loading ? (
+            <div className="text-gray-500">Loading...</div>
+          ) : sub?.status === 'ACTIVE' ? (
+            <div className="space-y-5">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="companyName">Company name</Label>
+                  <Input id="companyName" value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="defaultMemo">Default memo</Label>
+                  <Input id="defaultMemo" value={defaultMemo} onChange={(e) => setDefaultMemo(e.target.value)} placeholder="e.g., Client support services" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Allowed categories</Label>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  {businessCategories.map((cat) => (
+                    <label key={cat} className="flex items-center gap-2 border rounded-md px-3 py-2 bg-white">
+                      <Checkbox checked={enabledCategories.includes(cat)} onCheckedChange={() => toggleCategory(cat)} />
+                      <span className="text-sm">{cat.replace(/_/g, ' ')}</span>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500">Only bookings in these categories can be tagged during checkout.</p>
+              </div>
+              <div className="flex gap-3">
+                <Button onClick={updateSubscription} disabled={loading}>Save Changes</Button>
+                <Badge variant="outline" className="self-center">Active · {sub.daysRemaining ?? ''} days left</Badge>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              <p className="text-gray-700">Enable exports and expense tagging for business use. Tag eligible favors and export monthly reports as CSV/PDF or Concur/Expensify JSON.</p>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="companyName-new">Company name</Label>
+                  <Input id="companyName-new" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Your company Inc." />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="defaultMemo-new">Default memo (optional)</Label>
+                  <Input id="defaultMemo-new" value={defaultMemo} onChange={(e) => setDefaultMemo(e.target.value)} placeholder="e.g., Field operations support" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Select allowed categories</Label>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  {businessCategories.map((cat) => (
+                    <label key={cat} className="flex items-center gap-2 border rounded-md px-3 py-2 bg-white">
+                      <Checkbox checked={enabledCategories.includes(cat)} onCheckedChange={() => toggleCategory(cat)} />
+                      <span className="text-sm">{cat.replace(/_/g, ' ')}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <Button onClick={createSubscription} disabled={loading || !companyName || enabledCategories.length === 0}>
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  Enable Business Expense Kit ($199/year)
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {sub?.status === 'ACTIVE' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Monthly Export
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid md:grid-cols-3 gap-4 items-end">
+              <div className="space-y-2">
+                <Label htmlFor="month">Month</Label>
+                <Input id="month" type="month" value={exportMonth} onChange={(e) => setExportMonth(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Format</Label>
+                <Select value={exportFormat} onValueChange={(v) => setExportFormat(v as any)}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select format" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="csv">CSV</SelectItem>
+                    <SelectItem value="pdf">PDF (stub JSON)</SelectItem>
+                    <SelectItem value="concur">Concur JSON</SelectItem>
+                    <SelectItem value="expensify">Expensify JSON</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="invisible">Export</Label>
+                <Button onClick={handleExport} disabled={exporting} className="w-full">
+                  <Download className="h-4 w-4 mr-2" />
+                  {exporting ? 'Exporting…' : 'Export'}
+                </Button>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500">CSV downloads directly. Other formats provide JSON stubs for integration.</p>
+          </CardContent>
+        </Card>
+      )}
+    </>
   );
 }
