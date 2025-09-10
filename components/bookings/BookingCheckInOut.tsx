@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import confetti from "canvas-confetti";
 import { TraitsSelector } from "@/components/reviews/TraitsSelector";
+import { ClaimInterface } from "@/components/claims/ClaimInterface";
 
 interface Booking {
   id: string;
@@ -31,6 +32,8 @@ interface Booking {
   providerThanks?: string;
   checkinLatitude?: number;
   checkinLongitude?: number;
+  isGuaranteed?: boolean;
+  guaranteedAt?: string;
   slot: {
     id: string;
     title: string;
@@ -314,6 +317,12 @@ export function BookingCheckInOut({ booking, currentUserId, onBookingUpdate }: B
 
   return (
     <div className="space-y-6">
+      {/* Claim Interface - Show for guaranteed bookings */}
+      <ClaimInterface 
+        booking={booking as any}
+        currentUserId={currentUserId}
+      />
+
       {/* Main Booking Card */}
       <Card>
         <CardHeader>

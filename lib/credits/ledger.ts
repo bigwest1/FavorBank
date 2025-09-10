@@ -159,7 +159,7 @@ export async function escrowLock(db: DB, circleId: string, fromUserId: string, a
   });
 }
 
-export async function escrowRelease(db: DB, circleId: string, toUserId: string, amount: number, bookingId: string, meta?: any) {
+export async function escrowRelease(db: DB, circleId: string, fromUserId: string, toUserId: string, amount: number, bookingId: string, meta?: any) {
   const client = getDb(db);
   return client.$transaction(async (tx: DB) => {
     await addLedgerPair(tx, {

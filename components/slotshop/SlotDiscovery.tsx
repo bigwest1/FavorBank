@@ -8,12 +8,14 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { 
   Search, Filter, Clock, DollarSign, MapPin, User, 
   Calendar, Star, Zap, AlertCircle 
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { toast } from "sonner";
+import { BookingForm } from "./BookingForm";
 
 interface Slot {
   id: string;
@@ -30,6 +32,11 @@ interface Slot {
     id: string;
     name: string;
     city: string | null;
+    proProfile?: {
+      id: string;
+      status: string;
+      backgroundCheckPassed: boolean;
+    };
   };
   createdAt: string;
 }
@@ -65,6 +72,8 @@ export function SlotDiscovery({ circleId, userHasProAccess = false }: SlotDiscov
   const [priceRange, setPriceRange] = useState<string>("");
   const [timeFilter, setTimeFilter] = useState<string>("");
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
+  const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchSlots();
@@ -108,26 +117,15 @@ export function SlotDiscovery({ circleId, userHasProAccess = false }: SlotDiscov
     return new Date(slot.start) > new Date();
   };
 
-  const handleBookSlot = async (slotId: string, duration: number) => {
-    try {
-      const response = await fetch(`/api/slots/${slotId}/book`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ duration })
-      });
+  const handleOpenBooking = (slot: Slot) => {
+    setSelectedSlot(slot);
+    setBookingDialogOpen(true);
+  };
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to book slot");
-      }
-
-      toast.success("Slot booked successfully!");
-      fetchSlots(); // Refresh the list
-    } catch (error: any) {
-      toast.error(error.message || "Failed to book slot");
-    }
+  const handleBookingSuccess = () => {
+    setBookingDialogOpen(false);
+    setSelectedSlot(null);
+    fetchSlots(); // Refresh the list
   };
 
   const SlotCard = ({ slot }: { slot: Slot }) => {
@@ -143,6 +141,12 @@ export function SlotDiscovery({ circleId, userHasProAccess = false }: SlotDiscov
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <CardTitle className="text-lg line-clamp-1">{slot.title}</CardTitle>
+                {slot.provider.proProfile?.status === "APPROVED" && (
+                  <Badge className="bg-yellow-500 text-white text-xs px-2 py-1">
+                    <Star className="h-3 w-3 mr-1" />
+                    PRO
+                  </Badge>
+                )}
                 {!available && (
                   <Badge variant="secondary" className="bg-gray-100 text-gray-600">
                     Past
@@ -217,15 +221,28 @@ export function SlotDiscovery({ circleId, userHasProAccess = false }: SlotDiscov
               </div>
             </div>
 
+            {/* Pro Cash Bonus */}
+            {slot.provider.proProfile?.status === "APPROVED" && (
+              <div className="bg-gradient-to-r from-green-50 to-blue-50 p-3 rounded border border-green-200">
+                <div className="flex items-center gap-2 text-sm">
+                  <DollarSign className="h-4 w-4 text-green-600" />
+                  <span className="font-medium text-green-700">Cash Bonus Eligible</span>
+                </div>
+                <div className="text-xs text-green-600 mt-1">
+                  Provider earns 15% cash bonus on completed bookings
+                </div>
+              </div>
+            )}
+
             {/* Action */}
             <div className="pt-2 border-t">
               {available ? (
                 <Button 
                   className="w-full" 
-                  onClick={() => handleBookSlot(slot.id, slot.minDuration)}
+                  onClick={() => handleOpenBooking(slot)}
                 >
                   <DollarSign className="h-4 w-4 mr-2" />
-                  Book {slot.minDuration} min for {minCost} credits
+                  Book This Slot
                 </Button>
               ) : (
                 <Button variant="outline" className="w-full" disabled>
@@ -414,6 +431,25 @@ export function SlotDiscovery({ circleId, userHasProAccess = false }: SlotDiscov
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Booking Dialog */}
+      <Dialog open={bookingDialogOpen} onOpenChange={setBookingDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Book: {selectedSlot?.title}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedSlot && (
+            <BookingForm
+              slot={selectedSlot}
+              onSuccess={handleBookingSuccess}
+              onCancel={() => setBookingDialogOpen(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

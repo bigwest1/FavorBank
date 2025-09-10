@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { escrowRelease } from "@/lib/credits/ledger";
+import { processBookingMatch } from "@/lib/treasury/matching";
 
 const CompleteSchema = z.object({
   completionNotes: z.string().max(500).optional(),
@@ -32,7 +33,11 @@ export async function POST(
             circle: true
           }
         },
-        provider: true,
+        provider: {
+          include: {
+            proProfile: true
+          }
+        },
         booker: true
       }
     });
@@ -63,14 +68,8 @@ export async function POST(
         where: { id: params.id },
         data: {
           status: "COMPLETED",
-          actualEnd: now,
-          completedAt: now,
-          completionNotes: data.completionNotes,
-          completionPhotoBase64: data.photoBase64,
-          ...(isProvider 
-            ? { providerThanks: data.thanks }
-            : { bookerThanks: data.thanks }
-          )
+          endTime: now,
+          notes: data.completionNotes || null
         }
       });
 
@@ -92,7 +91,30 @@ export async function POST(
         );
       }
 
-      return completedBooking;
+      // Create Pro bonus if provider is approved Pro user
+      if (booking.provider.proProfile?.status === "APPROVED" && 
+          booking.provider.proProfile.stripePayoutsEnabled && 
+          booking.totalCredits > 0) {
+        
+        // Calculate 15% cash bonus (convert credits to cents, assuming 1 credit = 1 cent for bonus calculation)
+        const bonusAmount = Math.round(booking.totalCredits * 0.15);
+        
+        await tx.proBonus.create({
+          data: {
+            userId: booking.providerId,
+            bookingId: booking.id,
+            baseAmount: booking.totalCredits,
+            bonusAmount: bonusAmount,
+            bonusRate: 0.15,
+            accrualDate: now
+          }
+        });
+      }
+
+      // Process Treasury credit matching
+      const matchResult = await processBookingMatch(booking.id, tx);
+      
+      return { ...completedBooking, matchResult };
     });
 
     // Get the updated booking with all relations
@@ -116,10 +138,17 @@ export async function POST(
       }
     });
 
+    // Create completion message including matching info
+    let message = "Booking completed successfully! Credits have been released.";
+    if (result.matchResult?.matched) {
+      message += ` Treasury matched ${result.matchResult.matchAmount} additional credits!`;
+    }
+
     return NextResponse.json({ 
       booking: fullBooking,
+      matchResult: result.matchResult,
       success: true,
-      message: "Booking completed successfully! Credits have been released."
+      message: message
     });
   } catch (error: any) {
     if (error instanceof z.ZodError) {

@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,23 +5,21 @@ generator client {
 datasource db {
   provider     = "mysql"
   url          = env("DATABASE_URL")
-  relationMode = "prisma" // PlanetScale: manage relations in Prisma, not DB
+  relationMode = "prisma"
 }
 
-// ---------- Enums ----------
-
-enum MembershipRole {
-  MEMBER
-  MODERATOR
+enum Role {
   OWNER
-  ADMIN
+  MODERATOR
+  MEMBER
 }
 
-enum RequestStatus {
-  OPEN
-  BOOKED
+enum BookingStatus {
+  CONFIRMED
+  IN_PROGRESS
   COMPLETED
   CANCELLED
+  NO_SHOW
 }
 
 enum SlotStatus {
@@ -34,586 +29,655 @@ enum SlotStatus {
   CANCELLED
 }
 
-enum BookingStatus {
-  PENDING
-  CONFIRMED
-  IN_PROGRESS  // Added for check-in state
-  COMPLETED
-  CANCELLED
-}
-
-enum UserTrait {
-  RELIABLE
-  CAREFUL
-  CHEERFUL
-  HELPFUL
-  RESPONSIVE
-  FRIENDLY
-}
-
-enum LedgerType {
-  CREDIT
-  DEBIT
-  FEE
-  ADJUSTMENT
-}
-
-enum CreditLotSource {
-  EARNED
-  PURCHASED
-  BONUS
-  GRANT
-  LOAN
-}
-
-enum LotTier {
-  BASIC
-  PRIORITY
-  GUARANTEED
-}
-
-enum RequestCategory {
-  HOUSEHOLD_TASKS
-  YARD_WORK
-  PET_CARE
-  CHILD_CARE
-  ELDER_CARE
-  TRANSPORTATION
-  TECH_SUPPORT
-  HOME_REPAIR
-  MOVING_HELP
-  ERRANDS
-  COOKING
+enum Category {
+  CLEANING
+  MAINTENANCE
+  TRANSPORT
+  CHILDCARE
+  ELDERCARE
   TUTORING
-  CREATIVE_PROJECTS
-  EVENT_HELP
+  TECH_SUPPORT
+  FOOD_PREP
+  SHOPPING
+  ADMINISTRATIVE
+  CREATIVE
+  FITNESS
+  GARDENING
+  PET_CARE
   OTHER
 }
 
-enum SubscriptionStatus {
-  ACTIVE
-  PAST_DUE
-  CANCELED
+enum TransactionType {
+  CREDIT
+  DEBIT
 }
 
-enum LoanStatus {
-  ACTIVE
-  REPAID
-  DEFAULTED
+enum LedgerKind {
+  BOOKING_ESCROW
+  BOOKING_PAYMENT
+  MEMBERSHIP_FEE
+  INSURANCE_PREMIUM
+  INSURANCE_CLAIM_REFUND
+  INSURANCE_BONUS
+  BONUS_PAYMENT
+  PENALTY_DEDUCTION
+  CANCELLATION_FEE
+  ADMIN_ADJUSTMENT
+  TREASURY_FUNDING
+  TREASURY_ALLOWANCE
+  TREASURY_MATCH
+  FEE_SURCHARGE
+  PLUS_CREDIT_GRANT
+}
+
+enum ClaimType {
+  NO_SHOW
+  UNSAFE_CONDITIONS
+  TASK_IMPOSSIBLE
+  OTHER
 }
 
 enum ClaimStatus {
-  SUBMITTED
-  APPROVED
-  DENIED
-  PAID
-}
-
-enum DisputeStatus {
-  OPEN
-  RESOLVED
-  REJECTED
-}
-
-enum OfferStatus {
   PENDING
-  ACCEPTED
+  HELPER_RESPONDED
+  MODERATOR_REVIEW
+  APPROVED
   REJECTED
-  WITHDRAWN
 }
 
-// ---------- Models ----------
+enum ProStatus {
+  PENDING      // Application submitted, under review
+  APPROVED     // Background check passed, can earn cash
+  REJECTED     // Application denied
+  SUSPENDED    // Temporarily suspended
+}
+
+enum SkillVerificationStatus {
+  PENDING      // Verification requested
+  VERIFIED     // Skill verified by moderator/system
+  REJECTED     // Verification failed
+}
+
+enum PlusSubscriptionStatus {
+  ACTIVE       // Plus subscription is active
+  CANCELLED    // Plus subscription cancelled but still valid until end
+  EXPIRED      // Plus subscription has expired
+  PAUSED       // Plus subscription temporarily paused
+}
+
+enum PayoutStatus {
+  PENDING      // Payout calculated but not sent
+  PROCESSING   // Payout sent to Stripe
+  COMPLETED    // Payout successfully transferred
+  FAILED       // Payout failed, needs retry
+}
+
+enum TreasuryFundingStatus {
+  PENDING      // Payment intent created, awaiting payment
+  PROCESSING   // Payment being processed by Stripe
+  COMPLETED    // Funds added to treasury
+  FAILED       // Payment failed
+  REFUNDED     // Payment was refunded
+}
+
+enum AllowanceDistributionStatus {
+  PENDING      // Scheduled for distribution
+  PROCESSING   // Currently being distributed
+  COMPLETED    // All distributions successful
+  PARTIAL      // Some distributions failed
+  FAILED       // Distribution completely failed
+}
 
 model User {
-  id           String  @id @default(cuid()) @db.VarChar(191)
-  email        String  @unique @db.VarChar(191)
-  passwordHash String
-  name         String? @db.VarChar(191)
-  city         String? @db.VarChar(191)
-  avatarSeed   String? @db.VarChar(191)
-  categories   Json?
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String?
+  passwordHash  String?
+  avatar        String?
+  phoneNumber   String?
+  bio           String?   @db.Text
+  isActive      Boolean   @default(true)
+  lastLoginAt   DateTime?
+  joinedAt      DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  memberships     Membership[]
-  requests        Request[]        @relation("RequestsByUser")
-  bookings        Booking[]        @relation("BookingsByProvider")
-  bookedSlots     Booking[]        @relation("BookingsByBooker")
-  notifications   Notification[]
-  disputesFiled   Dispute[]        @relation("DisputesFiled")
-  disputesAgainst Dispute[]        @relation("DisputesAgainst")
-  ownedCircles    Circle[]         @relation("CircleOwner")
-  creditLots      CreditLot[]
-  subscriptions   Subscription[]
-  proProfile      ProProfile?
-  loansBorrowed   Loan[]
-  ledgerFrom      LedgerEntry[]    @relation("LedgerFromUser")
-  ledgerTo        LedgerEntry[]    @relation("LedgerToUser")
-  insuranceClaims InsuranceClaim[]
-  invitesSent     CircleInvite[]   @relation("CircleInvitesSent")
-  invitesUsed     CircleInvite[]   @relation("CircleInvitesUsed")
-  joinRequests    JoinRequest[]    @relation("JoinRequestsByUser")
-  joinRequestsReviewed JoinRequest[] @relation("JoinRequestsReviewed")
-  offersAsHelper  Offer[]          @relation("OffersAsHelper")
-  slotsAsProvider Slot[]           @relation("SlotsByProvider")
-  reviewsGiven    Review[]         @relation("ReviewsGiven")
-  reviewsReceived Review[]         @relation("ReviewsReceived")
+  // Social connections (for traits system)
+  endorsementsGiven    Endorsement[] @relation("EndorserUser")
+  endorsementsReceived Endorsement[] @relation("EndorsedUser")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  // FavorBank relationships
+  memberships          Membership[]
+  ownedCircles         Circle[]       @relation("CircleOwner")
+  providedSlots        Slot[]         @relation("SlotProvider")
+  bookingsMade         Booking[]      @relation("BookingBooker")
+  bookingsProvided     Booking[]      @relation("BookingProvider")
+  ledgerEntriesFrom    LedgerEntry[]  @relation("LedgerFromUser")
+  ledgerEntriesTo      LedgerEntry[]  @relation("LedgerToUser")
+  reviewsGiven         Review[]       @relation("ReviewReviewer")
+  reviewsReceived      Review[]       @relation("ReviewReviewee")
+  
+  // Insurance claims
+  claimsMade           InsuranceClaim[] @relation("ClaimClaimant")
+  claimsAgainst        InsuranceClaim[] @relation("ClaimRespondent")
+  claimsModerated      InsuranceClaim[] @relation("ClaimModerator")
+
+  // Pro user relationships
+  proProfile           ProProfile?
+  skillVerifications   SkillVerification[]
+  proBonuses          ProBonus[]
+  payouts             Payout[]
+
+  // Treasury relationships
+  treasuriesManaged    CircleTreasury[]     @relation("TreasuryAdmin")
+  treasuryFunding      TreasuryFunding[]    @relation("TreasuryFunder")
+  
+  // Plus subscription relationships
+  plusSubscription     PlusSubscription?
+  plusCredits          PlusCreditGrant[]
+  plusDisputes         PlusAutoWinDispute[]
+  
+  @@map("users")
 }
 
 model Circle {
-  id          String  @id @default(cuid()) @db.VarChar(191)
-  name        String  @db.VarChar(191)
-  description String?
-  city        String? @db.VarChar(191)
-  ownerId     String  @db.VarChar(191)
-  owner       User    @relation("CircleOwner", fields: [ownerId], references: [id])
-  
-  // Circle settings
-  isPrivate     Boolean @default(false)  // Private = invitation only
-  quietHours    Json?                   // {start: "22:00", end: "07:00"}
-  allowsMinors  Boolean @default(true)
-  demurrageRate Float   @default(0.0)   // % monthly credit decay
-  categories    Json?                   // Enabled categories list
-  invites       CircleInvite[]
-  joinRequests  JoinRequest[]
-  slots         Slot[]
+  id               String   @id @default(cuid())
+  name             String
+  description      String?  @db.Text
+  ownerId          String
+  isActive         Boolean  @default(true)
+  memberLimit      Int?
+  feeStructure     Json?    // Flexible fee rules
+  rules            String?  @db.Text
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  memberships   Membership[]
-  requests      Request[]
-  treasury      Treasury?
-  insurance     InsurancePool?
-  ledgerEntries LedgerEntry[]
-  creditLots    CreditLot[]
-  feeRules      FeeRule[]
-  loans         Loan[]
-  disputes      Dispute[]
-  reviews       Review[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  owner            User           @relation("CircleOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  memberships      Membership[]
+  slots            Slot[]
+  bookings         Booking[]
+  ledgerEntries    LedgerEntry[]
+  reviews          Review[]
+  insurance        InsurancePool? // One-to-one with insurance pool
+  treasury         CircleTreasury? // One-to-one with treasury
 
   @@index([ownerId])
+  @@map("circles")
 }
 
 model Membership {
-  id             String         @id @default(cuid()) @db.VarChar(191)
-  userId         String         @db.VarChar(191)
-  circleId       String         @db.VarChar(191)
-  role           MembershipRole @default(MEMBER)
-  balanceCredits Int            @default(0)
+  id             String   @id @default(cuid())
+  userId         String
+  circleId       String
+  role           Role     @default(MEMBER)
+  balanceCredits Int      @default(0)
+  joinedAt       DateTime @default(now())
+  isActive       Boolean  @default(true)
 
-  user   User   @relation(fields: [userId], references: [id])
-  circle Circle @relation(fields: [circleId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([userId, circleId])
-  @@index([userId])
-  @@index([circleId])
-}
-
-model CircleInvite {
-  id          String    @id @default(cuid()) @db.VarChar(191)
-  circleId    String    @db.VarChar(191)
-  circle      Circle    @relation(fields: [circleId], references: [id])
-  inviterId   String    @db.VarChar(191)
-  inviter     User      @relation("CircleInvitesSent", fields: [inviterId], references: [id])
-  token       String    @unique @db.VarChar(191) // Single-use token
-  email       String?   @db.VarChar(191) // Optional: specific email invite
-  usedById    String?   @db.VarChar(191)
-  usedBy      User?     @relation("CircleInvitesUsed", fields: [usedById], references: [id])
-  usedAt      DateTime?
-  expiresAt   DateTime
-
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  @@index([circleId])
-  @@index([token])
-  @@index([inviterId])
-}
-
-model JoinRequest {
-  id        String   @id @default(cuid()) @db.VarChar(191)
-  circleId  String   @db.VarChar(191)
-  circle    Circle   @relation(fields: [circleId], references: [id])
-  userId    String   @db.VarChar(191)
-  user      User     @relation("JoinRequestsByUser", fields: [userId], references: [id])
-  message   String?  @db.Text
-  status    String   @default("PENDING") // PENDING, APPROVED, REJECTED
-  reviewedBy String? @db.VarChar(191)
-  reviewer   User?   @relation("JoinRequestsReviewed", fields: [reviewedBy], references: [id])
-  reviewedAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  circle         Circle   @relation(fields: [circleId], references: [id], onDelete: Cascade)
 
   @@unique([userId, circleId])
-  @@index([circleId])
   @@index([userId])
-  @@index([status])
-}
-
-model Request {
-  id          String        @id @default(cuid()) @db.VarChar(191)
-  circleId    String        @db.VarChar(191)
-  userId      String        @db.VarChar(191) // requester
-  title       String        @db.VarChar(191)
-  description String?       @db.Text
-  status      RequestStatus @default(OPEN)
-  
-  // New fields for enhanced request system
-  category           RequestCategory
-  photoBase64        String?         @db.LongText // Base64 encoded photo
-  effortLevel        Int             @default(3) // 1-5 scale
-  creditsOffered     Int             // Auto-calculated from effort
-  tier              LotTier         @default(BASIC)
-  
-  // Time constraints  
-  timeWindowStart   DateTime?       // When help is needed (start)
-  timeWindowEnd     DateTime?       // When help is needed (end)
-  expiresAt         DateTime?       // When request expires if not filled
-  
-  // Location
-  locationRadius    Float?          // km radius for in-person help
-  address           String?         @db.VarChar(500) // Optional specific address
-  city              String?         @db.VarChar(191) // City for map markers
-  
-  // Equipment/special requirements
-  equipmentNeeded   Json?           // Array of equipment flags
-  specialRequirements String?       @db.Text
-
-  circle   Circle    @relation(fields: [circleId], references: [id])
-  user     User      @relation("RequestsByUser", fields: [userId], references: [id])
-  slots    Slot[]
-  bookings Booking[]
-  offers   Offer[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
   @@index([circleId])
-  @@index([userId])
-  @@index([status])
-  @@index([category])
-  @@index([tier])
-  @@index([city])
-  @@index([expiresAt])
-}
-
-model Offer {
-  id        String      @id @default(cuid()) @db.VarChar(191)
-  requestId String      @db.VarChar(191)
-  helperId  String      @db.VarChar(191)
-  status    OfferStatus @default(PENDING)
-  
-  message          String?   @db.Text // Helper's note
-  proposedStartAt  DateTime? // When helper can start
-  estimatedHours   Float?    // How long helper thinks it will take
-  
-  // Contact info revealed after acceptance
-  helperPhone      String?   @db.VarChar(50)
-  helperEmail      String?   @db.VarChar(191)
-  
-  request Request @relation(fields: [requestId], references: [id])
-  helper  User    @relation("OffersAsHelper", fields: [helperId], references: [id])
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  @@unique([requestId, helperId]) // One offer per helper per request
-  @@index([requestId])
-  @@index([helperId])
-  @@index([status])
+  @@map("memberships")
 }
 
 model Slot {
-  id        String     @id @default(cuid()) @db.VarChar(191)
-  requestId String?    @db.VarChar(191) // Optional - can be standalone SlotShop slot
-  providerId String    @db.VarChar(191) // User offering availability
-  circleId  String     @db.VarChar(191) // Circle where slot is available
-  
-  start     DateTime
-  end       DateTime
-  location  String?    @db.VarChar(191)
-  status    SlotStatus @default(OPEN)
-  
-  // SlotShop specific fields
-  title            String?           @db.VarChar(191)
-  description      String?           @db.Text
-  category         RequestCategory?  // What kind of help offered
-  pricePerMinute   Int              @default(1) // Credits per minute
-  minDuration      Int              @default(5) // Minimum booking duration in minutes
-  maxDuration      Int?             // Maximum booking duration in minutes
-  
-  // Relations
-  request  Request?  @relation(fields: [requestId], references: [id])
-  provider User     @relation("SlotsByProvider", fields: [providerId], references: [id])
-  circle   Circle   @relation(fields: [circleId], references: [id])
-  bookings Booking[]
+  id             String      @id @default(cuid())
+  circleId       String
+  providerId     String
+  title          String
+  description    String?     @db.Text
+  category       Category
+  start          DateTime
+  end            DateTime
+  pricePerMinute Int         // In credits
+  minDuration    Int         // Minimum booking duration in minutes
+  maxDuration    Int?        // Maximum booking duration in minutes
+  status         SlotStatus  @default(OPEN)
+  location       String?
+  requirements   String?     @db.Text
+  maxBookers     Int         @default(1)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  circle         Circle      @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  provider       User        @relation("SlotProvider", fields: [providerId], references: [id], onDelete: Cascade)
+  bookings       Booking[]
 
-  @@index([requestId])
-  @@index([providerId])
   @@index([circleId])
+  @@index([providerId])
+  @@index([start])
   @@index([status])
-  @@index([start, end]) // For time-based queries
   @@index([category])
+  @@map("slots")
 }
 
 model Booking {
-  id         String        @id @default(cuid()) @db.VarChar(191)
-  requestId  String?       @db.VarChar(191) // Optional - can be standalone slot booking
-  slotId     String        @db.VarChar(191)
-  providerId String        @db.VarChar(191) // user who fulfills
-  bookerId   String        @db.VarChar(191) // user who books (different from provider)
-  status     BookingStatus @default(PENDING)
-  
-  // SlotShop specific fields
-  duration       Int?              // Booked duration in minutes
-  totalCredits   Int?              // Total credits for this booking
-  actualStart    DateTime?         // When the booking actually started
-  actualEnd      DateTime?         // When the booking actually ended
-  bookerNotes    String?           @db.Text // Notes from the booker
-  providerNotes  String?           @db.Text // Notes from the provider
-  
-  // Completion fields
-  completionNotes        String?    @db.Text // Completion notes
-  completionPhotoBase64  String?    @db.LongText // Optional completion photo
-  bookerThanks          String?     @db.Text // Thank you from booker
-  providerThanks        String?     @db.Text // Thank you from provider
-  checkinLatitude       Float?      // Geolocation at check-in
-  checkinLongitude      Float?      // Geolocation at check-in
-  completedAt           DateTime?   // When marked as completed
+  id            String        @id @default(cuid())
+  slotId        String
+  providerId    String
+  bookerId      String
+  circleId      String
+  status        BookingStatus @default(CONFIRMED)
+  duration      Int           // In minutes
+  totalCredits  Int           // Total cost
+  isGuaranteed  Boolean       @default(false) // New: Whether this booking is guaranteed
+  guaranteedAt  DateTime?     // New: When the guarantee was applied
+  startTime     DateTime?     // Actual start time
+  endTime       DateTime?     // Actual end time
+  notes         String?       @db.Text
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
-  request         Request?         @relation(fields: [requestId], references: [id])
-  slot            Slot             @relation(fields: [slotId], references: [id])
-  provider        User             @relation("BookingsByProvider", fields: [providerId], references: [id])
-  booker          User             @relation("BookingsByBooker", fields: [bookerId], references: [id])
-  ledger          LedgerEntry[]
-  insuranceClaims InsuranceClaim[]
-  disputes        Dispute[]
-  reviews         Review[]
+  slot          Slot            @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  provider      User            @relation("BookingProvider", fields: [providerId], references: [id], onDelete: Cascade)
+  booker        User            @relation("BookingBooker", fields: [bookerId], references: [id], onDelete: Cascade)
+  circle        Circle          @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  ledgerEntries LedgerEntry[]
+  reviews       Review[]
+  insuranceClaims InsuranceClaim[] // New: Insurance claims for this booking
+  proBonuses    ProBonus[]       // Pro bonuses generated by this booking
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([requestId])
   @@index([slotId])
   @@index([providerId])
   @@index([bookerId])
+  @@index([circleId])
   @@index([status])
+  @@index([isGuaranteed]) // New index for guaranteed bookings
+  @@map("bookings")
 }
 
 model LedgerEntry {
-  id         String     @id @default(cuid()) @db.VarChar(191)
-  circleId   String     @db.VarChar(191)
-  bookingId  String?    @db.VarChar(191)
-  fromUserId String?    @db.VarChar(191)
-  toUserId   String?    @db.VarChar(191)
-  amount     Int
-  type       LedgerType
-  meta       Json?
+  id        String          @id @default(cuid())
+  circleId  String
+  bookingId String?         // Optional - some entries might not be booking-related
+  fromUserId String?        // Null for system/pool entries
+  toUserId   String?        // Null for system/pool entries
+  amount    Int
+  type      TransactionType
+  meta      Json?           // Flexible metadata for different transaction types
+  timestamp DateTime        @default(now())
 
-  circle  Circle   @relation(fields: [circleId], references: [id])
-  booking Booking? @relation(fields: [bookingId], references: [id])
-  from    User?    @relation("LedgerFromUser", fields: [fromUserId], references: [id])
-  to      User?    @relation("LedgerToUser", fields: [toUserId], references: [id])
-
-  createdAt DateTime @default(now())
+  circle    Circle   @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  fromUser  User?    @relation("LedgerFromUser", fields: [fromUserId], references: [id], onDelete: SetNull)
+  toUser    User?    @relation("LedgerToUser", fields: [toUserId], references: [id], onDelete: SetNull)
 
   @@index([circleId])
   @@index([bookingId])
   @@index([fromUserId])
   @@index([toUserId])
-}
-
-model CreditLot {
-  id        String          @id @default(cuid()) @db.VarChar(191)
-  userId    String          @db.VarChar(191)
-  circleId  String          @db.VarChar(191)
-  amount    Int
-  remaining Int
-  source    CreditLotSource
-  tier      LotTier
-  expiresAt DateTime?
-
-  user   User   @relation(fields: [userId], references: [id])
-  circle Circle @relation(fields: [circleId], references: [id])
-
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([circleId])
-}
-
-model FeeRule {
-  id         String  @id @default(cuid()) @db.VarChar(191)
-  circleId   String  @db.VarChar(191)
-  name       String  @db.VarChar(191)
-  percentBps Int? // basis points, e.g., 250 = 2.5%
-  flatFee    Int? // in credits
-  appliesTo  String? @db.VarChar(191) // e.g., 'booking', 'transfer'
-  active     Boolean @default(true)
-
-  circle Circle @relation(fields: [circleId], references: [id])
-
-  @@index([circleId])
-}
-
-model Subscription {
-  id               String             @id @default(cuid()) @db.VarChar(191)
-  userId           String             @db.VarChar(191)
-  status           SubscriptionStatus @default(ACTIVE)
-  plan             String             @db.VarChar(191)
-  currentPeriodEnd DateTime?
-  stripeCustomerId String?            @db.VarChar(191)
-  stripeSubId      String?            @db.VarChar(191)
-
-  user User @relation(fields: [userId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-  @@index([status])
-}
-
-model ProProfile {
-  id         String  @id @default(cuid()) @db.VarChar(191)
-  userId     String  @unique @db.VarChar(191)
-  bio        String?
-  skills     Json?
-  hourlyRate Int? // in credits
-
-  user User @relation(fields: [userId], references: [id])
-}
-
-model Treasury {
-  id              String @id @default(cuid()) @db.VarChar(191)
-  circleId        String @unique @db.VarChar(191)
-  balanceCredits  Int    @default(0)
-  reservedCredits Int    @default(0)
-
-  circle Circle @relation(fields: [circleId], references: [id])
-}
-
-model Loan {
-  id         String     @id @default(cuid()) @db.VarChar(191)
-  circleId   String     @db.VarChar(191)
-  borrowerId String     @db.VarChar(191)
-  principal  Int
-  remaining  Int
-  status     LoanStatus @default(ACTIVE)
-
-  circle   Circle @relation(fields: [circleId], references: [id])
-  borrower User   @relation(fields: [borrowerId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([circleId])
-  @@index([borrowerId])
-  @@index([status])
-}
-
-model InsurancePool {
-  id         String @id @default(cuid()) @db.VarChar(191)
-  circleId   String @unique @db.VarChar(191)
-  balance    Int    @default(0)
-  premiumBps Int? // basis points for premiums
-
-  circle Circle           @relation(fields: [circleId], references: [id])
-  claims InsuranceClaim[]
-}
-
-model InsuranceClaim {
-  id        String      @id @default(cuid()) @db.VarChar(191)
-  poolId    String      @db.VarChar(191)
-  userId    String      @db.VarChar(191)
-  bookingId String?     @db.VarChar(191)
-  amount    Int
-  status    ClaimStatus @default(SUBMITTED)
-  notes     String?
-
-  pool    InsurancePool @relation(fields: [poolId], references: [id])
-  user    User          @relation(fields: [userId], references: [id])
-  booking Booking?      @relation(fields: [bookingId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([poolId])
-  @@index([userId])
-  @@index([status])
-}
-
-model Dispute {
-  id         String        @id @default(cuid()) @db.VarChar(191)
-  circleId   String        @db.VarChar(191)
-  bookingId  String        @db.VarChar(191)
-  filedById  String        @db.VarChar(191)
-  againstId  String        @db.VarChar(191)
-  status     DisputeStatus @default(OPEN)
-  reason     String?
-  resolution String?
-
-  circle  Circle  @relation(fields: [circleId], references: [id])
-  booking Booking @relation(fields: [bookingId], references: [id])
-  filedBy User    @relation("DisputesFiled", fields: [filedById], references: [id])
-  against User    @relation("DisputesAgainst", fields: [againstId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([circleId])
-  @@index([bookingId])
-  @@index([filedById])
-  @@index([againstId])
-  @@index([status])
-}
-
-model Notification {
-  id      String  @id @default(cuid()) @db.VarChar(191)
-  userId  String  @db.VarChar(191)
-  type    String  @db.VarChar(191)
-  read    Boolean @default(false)
-  payload Json?
-
-  user User @relation(fields: [userId], references: [id])
-
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([type])
-  @@index([read])
+  @@index([timestamp])
+  @@map("ledger_entries")
 }
 
 model Review {
-  id         String      @id @default(cuid()) @db.VarChar(191)
-  bookingId  String      @db.VarChar(191)
-  reviewerId String      @db.VarChar(191) // person leaving the review
-  revieweeId String      @db.VarChar(191) // person being reviewed
-  circleId   String      @db.VarChar(191)
-  
-  // Positive traits only - no ratings, just tags
-  traits     UserTrait[]  // Array of positive traits selected
-  note       String?      @db.Text // Optional positive note
-  
-  booking   Booking @relation(fields: [bookingId], references: [id])
-  reviewer  User    @relation("ReviewsGiven", fields: [reviewerId], references: [id])
-  reviewee  User    @relation("ReviewsReceived", fields: [revieweeId], references: [id])
-  circle    Circle  @relation(fields: [circleId], references: [id])
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  bookingId   String
+  circleId    String
+  reviewerId  String   // Person giving the review
+  revieweeId  String   // Person being reviewed
+  rating      Int      // 1-5 scale
+  comment     String?  @db.Text
+  traits      Json?    // Structured trait ratings
+  isPublic    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  booking     Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  circle      Circle   @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  reviewer    User     @relation("ReviewReviewer", fields: [reviewerId], references: [id], onDelete: Cascade)
+  reviewee    User     @relation("ReviewReviewee", fields: [revieweeId], references: [id], onDelete: Cascade)
 
   @@unique([bookingId, reviewerId]) // One review per booking per reviewer
   @@index([revieweeId])
   @@index([circleId])
-  @@index([createdAt])
+  @@map("reviews")
+}
+
+model Endorsement {
+  id          String   @id @default(cuid())
+  endorserId  String   // Person giving the endorsement
+  endorsedId  String   // Person being endorsed
+  trait       String   // Specific trait being endorsed
+  strength    Int      // 1-3 scale (1=weak, 2=moderate, 3=strong)
+  context     String?  @db.Text // Optional context/example
+  createdAt   DateTime @default(now())
+
+  endorser    User     @relation("EndorserUser", fields: [endorserId], references: [id], onDelete: Cascade)
+  endorsed    User     @relation("EndorsedUser", fields: [endorsedId], references: [id], onDelete: Cascade)
+
+  @@unique([endorserId, endorsedId, trait]) // One endorsement per trait per pair
+  @@index([endorsedId])
+  @@index([trait])
+  @@map("endorsements")
+}
+
+model InsurancePool {
+  id           String   @id @default(cuid())
+  circleId     String   @unique // One pool per circle
+  balance      Int      @default(0) // Current balance in credits
+  premiumRate  Float    @default(0.05) // 5% premium rate
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  circle       Circle            @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  claims       InsuranceClaim[]
+
+  @@map("insurance_pools")
+}
+
+model InsuranceClaim {
+  id              String      @id @default(cuid())
+  poolId          String      // Insurance pool this claim is against
+  bookingId       String      // Booking this claim relates to
+  claimantId      String      // User filing the claim (usually the booker)
+  respondentId    String      // User being claimed against (usually the provider)
+  claimType       ClaimType   // Type of claim
+  status          ClaimStatus @default(PENDING)
+  description     String      @db.Text // Detailed description of the issue
+  amount          Int         // Original booking amount to refund
+  bonusAmount     Int         @default(0) // Bonus amount (20% of original)
+  totalPayout     Int         // Total amount claimant will receive (amount + bonus)
+  claimDeadline   DateTime    // Deadline for response before auto-resolution
+  
+  // Response tracking
+  helperResponse     String?   @db.Text // Response from the helper/provider
+  helperRespondedAt  DateTime? // When helper responded
+  
+  // Resolution tracking
+  resolvedAt      DateTime? // When claim was resolved
+  autoResolved    Boolean   @default(false) // Whether resolved automatically
+  moderatorId     String?   // Moderator who resolved (if manual)
+  moderatorNotes  String?   @db.Text // Notes from moderator
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  pool            InsurancePool @relation(fields: [poolId], references: [id], onDelete: Cascade)
+  booking         Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  claimant        User          @relation("ClaimClaimant", fields: [claimantId], references: [id], onDelete: Cascade)
+  respondent      User          @relation("ClaimRespondent", fields: [respondentId], references: [id], onDelete: Cascade)
+  moderator       User?         @relation("ClaimModerator", fields: [moderatorId], references: [id], onDelete: SetNull)
+
+  @@index([poolId])
+  @@index([bookingId])
+  @@index([claimantId])
+  @@index([respondentId])
+  @@index([status])
+  @@index([claimDeadline])
+  @@map("insurance_claims")
+}
+
+model ProProfile {
+  id                    String    @id @default(cuid())
+  userId                String    @unique
+  status                ProStatus @default(PENDING)
+  
+  // Onboarding information
+  backgroundCheckPassed Boolean   @default(false)
+  minDurationMinutes    Int       @default(30) // Minimum booking duration for pro
+  
+  // Stripe Connect information
+  stripeAccountId       String?   // Stripe Connect Express account ID
+  stripeOnboardingUrl   String?   // URL for continuing onboarding
+  stripeDetailsSubmitted Boolean  @default(false)
+  stripeChargesEnabled   Boolean  @default(false)
+  stripePayoutsEnabled   Boolean  @default(false)
+  
+  // Application and review
+  applicationNotes      String?   @db.Text
+  reviewedBy            String?   // User ID of reviewer
+  reviewedAt            DateTime?
+  reviewNotes           String?   @db.Text
+  
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("pro_profiles")
+}
+
+model SkillVerification {
+  id          String                   @id @default(cuid())
+  userId      String
+  skill       String                   // Skill name/tag
+  status      SkillVerificationStatus  @default(PENDING)
+  evidence    String?                  @db.Text // Portfolio links, certifications, etc.
+  verifiedBy  String?                  // User ID of verifier
+  verifiedAt  DateTime?
+  notes       String?                  @db.Text
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+
+  user        User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, skill])
+  @@index([skill])
+  @@index([status])
+  @@map("skill_verifications")
+}
+
+model ProBonus {
+  id              String   @id @default(cuid())
+  userId          String   // Pro user earning the bonus
+  bookingId       String   // Booking that generated the bonus
+  baseAmount      Int      // Original booking amount in credits
+  bonusAmount     Int      // 15% cash bonus amount in cents
+  bonusRate       Float    @default(0.15) // 15% bonus rate
+  accrualDate     DateTime @default(now())
+  payoutId        String?  // Reference to payout when paid out
+  
+  createdAt       DateTime @default(now())
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  booking         Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  payout          Payout?  @relation(fields: [payoutId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([bookingId])
+  @@index([accrualDate])
+  @@index([payoutId])
+  @@map("pro_bonuses")
+}
+
+model Payout {
+  id                  String      @id @default(cuid())
+  userId              String      // Pro user receiving payout
+  status              PayoutStatus @default(PENDING)
+  
+  // Payout details
+  totalAmount         Int         // Total amount in cents
+  bonusCount          Int         // Number of bonuses included
+  weekStartDate       DateTime    // Start of payout week
+  weekEndDate         DateTime    // End of payout week
+  
+  // Stripe information
+  stripeTransferId    String?     // Stripe transfer ID
+  stripeAccountId     String      // Stripe Connect account ID
+  
+  // Processing information
+  processedAt         DateTime?
+  failureReason       String?     @db.Text
+  retryCount          Int         @default(0)
+  
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  user                User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bonuses             ProBonus[]  // Bonuses included in this payout
+
+  @@index([userId])
+  @@index([status])
+  @@index([weekStartDate])
+  @@index([processedAt])
+  @@map("payouts")
+}
+
+model CircleTreasury {
+  id                    String   @id @default(cuid())
+  circleId              String   @unique // One treasury per circle
+  
+  // Current balances
+  currentBalance        Int      @default(0) // Current credits available for distribution/matching
+  totalFunded           Int      @default(0) // Total amount funded over time
+  totalDistributed      Int      @default(0) // Total credits distributed as allowances
+  totalMatched          Int      @default(0) // Total credits spent on matching
+  
+  // Monthly allowance settings
+  monthlyAllowanceTotal Int      @default(0) // Total monthly allowance budget
+  allowancePerMember    Int      @default(0) // Credits per member per month
+  isAllowanceActive     Boolean  @default(false) // Whether auto-distribution is enabled
+  lastDistribution      DateTime? // When allowances were last distributed
+  
+  // Matching settings
+  isMatchingActive      Boolean  @default(false) // Whether credit matching is enabled
+  matchRatio            Float    @default(1.0) // Match ratio (1.0 = 1:1, 2.0 = 2:1, etc.)
+  maxMatchPerBooking    Int?     // Optional cap on match amount per booking
+  
+  // Admin settings
+  adminUserId           String?  // User who can manage treasury (defaults to circle owner)
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  circle                Circle                   @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  adminUser             User?                    @relation("TreasuryAdmin", fields: [adminUserId], references: [id], onDelete: SetNull)
+  fundingTransactions   TreasuryFunding[]
+  allowanceDistributions AllowanceDistribution[]
+  
+  @@map("circle_treasuries")
+}
+
+model TreasuryFunding {
+  id                String                 @id @default(cuid())
+  treasuryId        String                 // Treasury being funded
+  
+  // Funding details
+  amountCents       Int                    // Amount in cents (USD)
+  creditAmount      Int                    // Credits purchased (based on conversion rate)
+  conversionRate    Float                  @default(1.0) // Cents per credit (100 = $1 per credit)
+  
+  // Payment details
+  stripePaymentIntentId String?            // Stripe Payment Intent ID
+  status            TreasuryFundingStatus  @default(PENDING)
+  
+  // Metadata
+  fundedByUserId    String?                // User who initiated funding
+  notes             String?                @db.Text
+  processedAt       DateTime?              // When funding was completed
+  
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  treasury          CircleTreasury         @relation(fields: [treasuryId], references: [id], onDelete: Cascade)
+  fundedBy          User?                  @relation("TreasuryFunder", fields: [fundedByUserId], references: [id], onDelete: SetNull)
+  
+  @@index([treasuryId])
+  @@index([status])
+  @@index([processedAt])
+  @@map("treasury_funding")
+}
+
+model AllowanceDistribution {
+  id                String                        @id @default(cuid())
+  treasuryId        String                        // Treasury providing allowances
+  
+  // Distribution details
+  totalAmount       Int                          // Total credits distributed
+  memberCount       Int                          // Number of members who received allowance
+  creditsPerMember  Int                          // Credits given to each member
+  month             Int                          // Month (1-12)
+  year              Int                          // Year (e.g., 2025)
+  
+  // Processing details
+  status            AllowanceDistributionStatus  @default(PENDING)
+  startedAt         DateTime?                    // When distribution began
+  completedAt       DateTime?                    // When distribution finished
+  errorMessage      String?                      @db.Text // Error details if failed
+  
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+
+  treasury          CircleTreasury               @relation(fields: [treasuryId], references: [id], onDelete: Cascade)
+  
+  @@unique([treasuryId, year, month]) // One distribution per treasury per month
+  @@index([treasuryId])
+  @@index([year, month])
+  @@index([status])
+  @@map("allowance_distributions")
+}
+
+// ==========================================
+// PLUS SUBSCRIPTION MODELS
+// ==========================================
+
+model PlusSubscription {
+  id                   String                 @id @default(cuid())
+  userId               String                 @unique
+  status               PlusSubscriptionStatus @default(ACTIVE)
+  
+  // Subscription details
+  subscribedAt         DateTime               @default(now())
+  currentPeriodStart   DateTime               @default(now())
+  currentPeriodEnd     DateTime
+  autoRenew            Boolean                @default(true)
+  
+  // Stripe integration
+  stripeSubscriptionId String?                @unique
+  stripePriceId        String?
+  stripeCustomerId     String?
+  
+  // Benefit usage tracking
+  lastCreditGrant      DateTime?              // Last time monthly credits were granted
+  disputesUsedThisMonth Int                  @default(0)
+  lastMonthReset       DateTime?              // Track when dispute counter was last reset
+  
+  // Audit fields
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  
+  // Relationships
+  user                 User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([status])
+  @@index([currentPeriodEnd])
+  @@map("plus_subscriptions")
+}
+
+model PlusCreditGrant {
+  id              String   @id @default(cuid())
+  userId          String
+  amount          Int      // Amount of credits granted (typically 100)
+  grantedForMonth Int      // Month this grant is for (1-12)
+  grantedForYear  Int      // Year this grant is for
+  grantedAt       DateTime @default(now())
+  
+  // Relationships
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, grantedForYear, grantedForMonth]) // One grant per user per month
+  @@index([userId])
+  @@index([grantedForYear, grantedForMonth])
+  @@map("plus_credit_grants")
+}
+
+model PlusAutoWinDispute {
+  id               String   @id @default(cuid())
+  userId           String
+  originalClaimId  String   @unique // The claim that was auto-won
+  disputeAmount    Int      // Amount that was auto-won (< 50 credits)
+  usedForMonth     Int      // Month this auto-win was used (1-12)
+  usedForYear      Int      // Year this auto-win was used
+  usedAt           DateTime @default(now())
+  
+  // Relationships
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, usedForYear, usedForMonth]) // One auto-win per user per month
+  @@index([userId])
+  @@index([usedForYear, usedForMonth])
+  @@map("plus_auto_win_disputes")
 }

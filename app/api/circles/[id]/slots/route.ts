@@ -108,7 +108,14 @@ export async function GET(
           select: {
             id: true,
             name: true,
-            city: true
+            city: true,
+            proProfile: {
+              select: {
+                id: true,
+                status: true,
+                backgroundCheckPassed: true
+              }
+            }
           }
         },
         _count: {
@@ -234,7 +241,14 @@ export async function POST(
           select: {
             id: true,
             name: true,
-            city: true
+            city: true,
+            proProfile: {
+              select: {
+                id: true,
+                status: true,
+                backgroundCheckPassed: true
+              }
+            }
           }
         }
       }

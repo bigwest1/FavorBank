@@ -3,10 +3,18 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { escrowLock } from "@/lib/credits/ledger";
+import { FeesContext } from "@/lib/fees/context";
+import { recordFeeSurcharge } from "@/lib/fees/ledger";
 
 const BookSlotSchema = z.object({
   duration: z.number().min(5).max(480), // Duration in minutes
-  notes: z.string().max(500).optional()
+  notes: z.string().max(500).optional(),
+  feeContext: z.object({
+    isUrgent: z.boolean().optional(),
+    needsEquipment: z.boolean().optional(),
+    isGuaranteed: z.boolean().optional(),
+    crossCircle: z.boolean().optional()
+  }).optional()
 });
 
 export async function POST(
@@ -94,14 +102,36 @@ export async function POST(
       }, { status: 400 });
     }
 
-    // Calculate total credits needed
-    const totalCredits = data.duration * slot.pricePerMinute;
+    // Calculate base credits needed
+    const baseCredits = data.duration * slot.pricePerMinute;
 
-    // Check if user has enough credits
+    // Calculate dynamic fees
+    const bookingContext = {
+      startTime: new Date(slot.start),
+      endTime: new Date(slot.end),
+      duration: data.duration,
+      category: slot.category,
+      location: slot.location || undefined,
+      requirements: data.notes,
+      isUrgent: data.feeContext?.isUrgent,
+      needsEquipment: data.feeContext?.needsEquipment,
+      isGuaranteed: data.feeContext?.isGuaranteed,
+      crossCircle: data.feeContext?.crossCircle,
+      providerId: slot.providerId,
+      bookerId: session.user.id,
+      circleId: slot.circleId
+    };
+
+    const feeCalculation = FeesContext.calculateFees(baseCredits, bookingContext);
+    const totalCredits = feeCalculation.finalAmount;
+
+    // Check if user has enough credits (including fees)
     if (membership.balanceCredits < totalCredits) {
       return NextResponse.json({ 
         error: "Insufficient credits", 
-        required: totalCredits, 
+        required: totalCredits,
+        baseAmount: baseCredits,
+        fees: feeCalculation.totalSurchargeAmount,
         available: membership.balanceCredits 
       }, { status: 400 });
     }
@@ -121,12 +151,39 @@ export async function POST(
         }
       });
 
-      // Escrow lock the credits
+      // Record fee surcharge if applicable
+      if (feeCalculation.totalSurchargeAmount > 0) {
+        const feeContext = {
+          circleId: slot.circleId,
+          userId: session.user!.id,
+          bookingId: booking.id,
+          transactionType: "booking" as const,
+          feeBreakdown: {
+            baseAmount: baseCredits,
+            fees: feeCalculation.appliedFees.map(fee => ({
+              id: fee.rule.id,
+              name: fee.rule.name,
+              percentage: fee.percentage,
+              amount: fee.amount
+            })),
+            totalSurcharge: feeCalculation.totalSurchargeAmount,
+            finalAmount: feeCalculation.finalAmount,
+            capped: feeCalculation.capped,
+            capReason: feeCalculation.capReason
+          }
+        };
+        
+        await recordFeeSurcharge(feeContext, tx);
+      }
+
+      // Escrow lock the credits (including fees)
       await escrowLock(tx, slot.circleId, session.user!.id, totalCredits, booking.id, {
         kind: "SLOT_BOOKING",
         slotId: slot.id,
         bookingId: booking.id,
-        duration: data.duration
+        duration: data.duration,
+        baseAmount: baseCredits,
+        totalFees: feeCalculation.totalSurchargeAmount
       });
 
       // If the slot is fully booked, mark it as BOOKED
