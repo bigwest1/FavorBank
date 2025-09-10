@@ -1,6 +1,6 @@
 import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { stripe } from '@/lib/stripe/client'
+import { getStripe } from '@/lib/stripe/client'
 import { prisma } from '@/lib/prisma'
 import type Stripe from 'stripe'
 import { deposit } from '@/lib/credits/ledger'
@@ -68,6 +68,7 @@ export async function POST(req: Request) {
 
   let event: Stripe.Event
   try {
+    const stripe = getStripe()
     event = stripe.webhooks.constructEvent(raw, sig, whSecret)
   } catch (err: any) {
     return new NextResponse(`Webhook Error: ${err.message}`, { status: 400 })

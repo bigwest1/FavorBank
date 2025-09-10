@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { stripe } from '@/lib/stripe/client'
+import { getStripe } from '@/lib/stripe/client'
 import { PRICES, SUBSCRIPTION_PRICES, PackSize, Tier, SubPlan } from '@/lib/stripe/config'
 
 const BodyPack = (b: any) => {
@@ -28,6 +28,7 @@ export async function POST(req: Request) {
       const { userId, circleId, tier, units, successUrl, cancelUrl } = BodyPack(body)
       const price = PRICES[tier][units]
       if (!price) throw new Error('Price not configured')
+      const stripe = getStripe()
       const session = await stripe.checkout.sessions.create({
         mode: 'payment',
         payment_method_types: ['card'],
@@ -43,6 +44,7 @@ export async function POST(req: Request) {
       const { userId, circleId, plan, successUrl, cancelUrl } = BodySub(body)
       const price = SUBSCRIPTION_PRICES[plan]
       if (!price) throw new Error('Plan not configured')
+      const stripe = getStripe()
       const session = await stripe.checkout.sessions.create({
         mode: 'subscription',
         payment_method_types: ['card'],
@@ -59,4 +61,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: e.message ?? 'Failed to create checkout session' }, { status: 400 })
   }
 }
-
