@@ -68,6 +68,8 @@ enum LedgerKind {
   TREASURY_MATCH
   FEE_SURCHARGE
   PLUS_CREDIT_GRANT
+  LOAN_ISSUE
+  LOAN_REPAY
 }
 
 enum ClaimType {
@@ -103,6 +105,13 @@ enum PlusSubscriptionStatus {
   CANCELLED    // Plus subscription cancelled but still valid until end
   EXPIRED      // Plus subscription has expired
   PAUSED       // Plus subscription temporarily paused
+}
+
+enum LoanStatus {
+  ACTIVE       // Loan is being repaid
+  COMPLETED    // Loan fully repaid
+  DEFAULTED    // Loan missed payments and defaulted
+  CANCELLED    // Loan cancelled before completion
 }
 
 enum PayoutStatus {
@@ -176,6 +185,10 @@ model User {
   plusCredits          PlusCreditGrant[]
   plusDisputes         PlusAutoWinDispute[]
   
+  // Loan relationships
+  loans                Loan[]
+  loanEligibilities    LoanEligibility[]
+  
   @@map("users")
 }
 
@@ -199,6 +212,8 @@ model Circle {
   reviews          Review[]
   insurance        InsurancePool? // One-to-one with insurance pool
   treasury         CircleTreasury? // One-to-one with treasury
+  loans            Loan[]          // FavorLoans issued in this circle
+  loanEligibilities LoanEligibility[] // Loan eligibility assessments
 
   @@index([ownerId])
   @@map("circles")
@@ -292,6 +307,7 @@ model LedgerEntry {
   id        String          @id @default(cuid())
   circleId  String
   bookingId String?         // Optional - some entries might not be booking-related
+  loanId    String?         // Optional - for loan-related entries
   fromUserId String?        // Null for system/pool entries
   toUserId   String?        // Null for system/pool entries
   amount    Int
@@ -301,11 +317,13 @@ model LedgerEntry {
 
   circle    Circle   @relation(fields: [circleId], references: [id], onDelete: Cascade)
   booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  loan      Loan?    @relation(fields: [loanId], references: [id], onDelete: SetNull)
   fromUser  User?    @relation("LedgerFromUser", fields: [fromUserId], references: [id], onDelete: SetNull)
   toUser    User?    @relation("LedgerToUser", fields: [toUserId], references: [id], onDelete: SetNull)
 
   @@index([circleId])
   @@index([bookingId])
+  @@index([loanId])
   @@index([fromUserId])
   @@index([toUserId])
   @@index([timestamp])
@@ -680,4 +698,99 @@ model PlusAutoWinDispute {
   @@index([userId])
   @@index([usedForYear, usedForMonth])
   @@map("plus_auto_win_disputes")
+}
+
+// =============================================================================
+// FAVORLOAN MODELS
+// =============================================================================
+
+model Loan {
+  id                 String     @id @default(cuid())
+  circleId           String
+  borrowerId         String
+  principal          Int        // Original loan amount (up to 200 credits)
+  remaining          Int        // Remaining balance to be repaid
+  feeAmount          Int        // 10% fee (calculated as principal * 0.1)
+  totalAmount        Int        // Total owed (principal + fee)
+  status             LoanStatus @default(ACTIVE)
+  weeklyPayment      Int        // Weekly payment amount (totalAmount / ~8.57 weeks for 60 days)
+  nextPaymentDue     DateTime   // When next payment is due
+  paymentsRemaining  Int        // Number of payments left
+  issuedAt           DateTime   @default(now())
+  completedAt        DateTime?  // When loan was fully repaid
+  defaultedAt        DateTime?  // When loan went into default
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  
+  // Behavioral underwriting data at time of loan
+  membershipAgeAtLoan     Int      // Days since membership started
+  completionRateAtLoan    Float    // % of bookings completed successfully
+  disputeRateAtLoan       Float    // % of bookings with disputes
+  peerVouchCountAtLoan    Int      // Number of peer vouches/endorsements
+  
+  // Relationships
+  circle             Circle     @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  borrower           User       @relation(fields: [borrowerId], references: [id], onDelete: Cascade)
+  repayments         LoanRepayment[]
+  ledgerEntries      LedgerEntry[]
+  
+  @@index([circleId])
+  @@index([borrowerId])
+  @@index([status])
+  @@index([nextPaymentDue]) // For finding overdue loans
+  @@map("loans")
+}
+
+model LoanRepayment {
+  id                 String    @id @default(cuid())
+  loanId             String
+  amount             Int       // Amount of this repayment
+  scheduledDate      DateTime  // When payment was scheduled
+  actualDate         DateTime? // When payment was actually made (null if missed)
+  isAutomatic        Boolean   @default(true) // Whether this was an automatic weekly payment
+  createdAt          DateTime  @default(now())
+  
+  // Relationships
+  loan               Loan      @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  
+  @@index([loanId])
+  @@index([scheduledDate])
+  @@map("loan_repayments")
+}
+
+model LoanEligibility {
+  id                    String    @id @default(cuid())
+  userId                String
+  circleId              String
+  isEligible            Boolean   @default(false)
+  maxLoanAmount         Int       @default(0) // 0-200 based on underwriting
+  
+  // Behavioral metrics calculated at assessment time
+  membershipAge         Int       // Days since membership started
+  completionRate        Float     // % of bookings completed successfully  
+  disputeRate           Float     // % of bookings with disputes
+  peerVouchCount        Int       // Number of peer endorsements
+  currentBalance        Int       // Current credit balance
+  
+  // Eligibility factors
+  meetsAgeRequirement   Boolean   @default(false) // >= 30 days
+  meetsCompletionRate   Boolean   @default(false) // >= 80%
+  meetsDisputeRate      Boolean   @default(false) // <= 5%  
+  meetsPeerVouchReq     Boolean   @default(false) // >= 2 vouches
+  hasLowBalance         Boolean   @default(false) // < 20 credits (trigger condition)
+  
+  // Metadata
+  assessedAt            DateTime  @default(now())
+  nextAssessmentAt      DateTime? // When to re-assess (after 30 days)
+  
+  // Relationships  
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  circle                Circle    @relation(fields: [circleId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, circleId]) // One eligibility record per user per circle
+  @@index([userId])
+  @@index([circleId])
+  @@index([isEligible])
+  @@index([hasLowBalance]) // For showing "Need a jump-start?" cards
+  @@map("loan_eligibility")
 }

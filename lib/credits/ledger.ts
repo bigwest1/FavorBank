@@ -32,6 +32,7 @@ async function addLedgerPair(
     circleId: string;
     amount: number;
     bookingId?: string | null;
+    loanId?: string | null;
     fromUserId?: string | null;
     toUserId?: string | null;
     debitType?: "DEBIT" | "FEE" | "ADJUSTMENT" | "CREDIT";
@@ -39,13 +40,13 @@ async function addLedgerPair(
     meta?: any;
   }
 ) {
-  const { circleId, amount, bookingId = null, fromUserId = null, toUserId = null, meta } = params;
+  const { circleId, amount, bookingId = null, loanId = null, fromUserId = null, toUserId = null, meta } = params;
   const debitType = params.debitType ?? "DEBIT";
   const creditType = params.creditType ?? "CREDIT";
   await tx.ledgerEntry.createMany({
     data: [
-      { circleId, amount, bookingId, fromUserId, toUserId: null, type: debitType, meta },
-      { circleId, amount, bookingId, fromUserId: null, toUserId, type: creditType, meta },
+      { circleId, amount, bookingId, loanId, fromUserId, toUserId: null, type: debitType, meta },
+      { circleId, amount, bookingId, loanId, fromUserId: null, toUserId, type: creditType, meta },
     ],
   });
 }
@@ -211,47 +212,36 @@ export async function guaranteePoolPayout(db: DB, circleId: string, userId: stri
   });
 }
 
-export async function loanIssue(db: DB, circleId: string, borrowerId: string, amount: number, loanId?: string, meta?: any) {
-  const client = getDb(db);
-  return client.$transaction(async (tx: DB) => {
-    let loan = null as any;
-    if (loanId) {
-      loan = await tx.loan.update({ where: { id: loanId }, data: { principal: { increment: amount }, remaining: { increment: amount } } });
-    } else {
-      loan = await tx.loan.create({ data: { circleId, borrowerId, principal: amount, remaining: amount } });
-    }
-    await addLedgerPair(tx, {
-      circleId,
-      amount,
-      fromUserId: null,
-      toUserId: borrowerId,
-      debitType: "ADJUSTMENT",
-      creditType: "ADJUSTMENT",
-      meta: { kind: "loan_issue", loanId: loan.id, ...meta, from: "treasury", to: "user" },
-    });
-    await bumpTreasury(tx, circleId, -amount, 0);
-    await bumpMembership(tx, circleId, borrowerId, amount);
-    return loan;
+export async function loanIssue(tx: DB, circleId: string, borrowerId: string, amount: number, loanId: string, meta?: any) {
+  // Loan should already exist - this is just recording the ledger entry
+  await addLedgerPair(tx, {
+    circleId,
+    amount,
+    loanId,
+    fromUserId: null,
+    toUserId: borrowerId,
+    debitType: "DEBIT",
+    creditType: "CREDIT",
+    meta: { kind: "loan_issue", loanId, ...meta, from: "treasury", to: "user" },
   });
+  await bumpTreasury(tx, circleId, -amount, 0);
+  await bumpMembership(tx, circleId, borrowerId, amount);
 }
 
-export async function loanRepay(db: DB, circleId: string, borrowerId: string, amount: number, loanId: string, meta?: any) {
-  const client = getDb(db);
-  return client.$transaction(async (tx: DB) => {
-    const loan = await tx.loan.update({ where: { id: loanId }, data: { remaining: { decrement: amount } } });
-    await addLedgerPair(tx, {
-      circleId,
-      amount,
-      fromUserId: borrowerId,
-      toUserId: null,
-      debitType: "ADJUSTMENT",
-      creditType: "ADJUSTMENT",
-      meta: { kind: "loan_repay", loanId, ...meta, from: "user", to: "treasury" },
-    });
-    await bumpMembership(tx, circleId, borrowerId, -amount);
-    await bumpTreasury(tx, circleId, amount, 0);
-    return loan;
+export async function loanRepay(tx: DB, circleId: string, borrowerId: string, amount: number, loanId: string, meta?: any) {
+  // Don't update loan here - that's handled by the service layer
+  await addLedgerPair(tx, {
+    circleId,
+    amount,
+    loanId,
+    fromUserId: borrowerId,
+    toUserId: null,
+    debitType: "DEBIT",
+    creditType: "CREDIT",
+    meta: { kind: "loan_repay", loanId, ...meta, from: "user", to: "treasury" },
   });
+  await bumpMembership(tx, circleId, borrowerId, -amount);
+  await bumpTreasury(tx, circleId, amount, 0);
 }
 
 export async function insurancePremium(db: DB, circleId: string, userId: string, amount: number, meta?: any) {
