@@ -16,6 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { toast } from "sonner";
 
 interface PlusDetails {
   isActive: boolean;
@@ -262,20 +264,7 @@ export default function SettingsPage() {
 
         {/* Notifications Tab */}
         <TabsContent value="notifications" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bell className="h-5 w-5" />
-                Notification Preferences
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-gray-500">
-                <Bell className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Notification settings coming soon</p>
-              </div>
-            </CardContent>
-          </Card>
+          <NotificationSettings />
         </TabsContent>
 
         {/* Privacy Tab */}
@@ -296,6 +285,128 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function NotificationSettings() {
+  const { data: session } = useSession();
+  const user = session?.user;
+
+  const [circles, setCircles] = useState<any[]>([]);
+  const [prefs, setPrefs] = useState<Record<string, any>>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    (async () => {
+      setLoading(true);
+      try {
+        const res = await fetch('/api/circles');
+        if (res.ok) {
+          const data = await res.json();
+          setCircles(data);
+          // fetch prefs per circle
+          const entries: Record<string, any> = {};
+          await Promise.all(data.map(async (c: any) => {
+            const r = await fetch(`/api/circles/${c.id}/notification-preferences`);
+            const p = r.ok ? (await r.json()).preferences : null;
+            entries[c.id] = p || { newOffers: true, bookingReminders: true, startFinishNudges: true, dailyEmail: true };
+          }));
+          setPrefs(entries);
+        }
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [user?.id]);
+
+  const updatePref = async (circleId: string, key: string, value: boolean) => {
+    setSaving(circleId + key);
+    try {
+      const res = await fetch(`/api/circles/${circleId}/notification-preferences`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [key]: value })
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to save');
+      }
+      setPrefs((prev) => ({ ...prev, [circleId]: { ...prev[circleId], [key]: value } }));
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  const triggerTestToasts = async () => {
+    const res = await fetch('/api/notifications/test', { method: 'POST' });
+    if (res.ok) toast.success('Created test in-app notifications');
+    else toast.error('Failed to create test notifications');
+  };
+  const triggerTestDigest = async () => {
+    const res = await fetch('/api/notifications/digest/test', { method: 'POST' });
+    if (res.ok) {
+      const data = await res.json();
+      toast.success('Test daily email generated');
+      console.log('Digest preview:', data.preview);
+    } else toast.error('Failed to trigger digest');
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="h-5 w-5" />
+            Notification Preferences by Circle
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="text-gray-500">Loading…</div>
+          ) : circles.length === 0 ? (
+            <div className="text-gray-500">Join a circle to configure notifications.</div>
+          ) : (
+            <div className="space-y-4">
+              {circles.map((c) => (
+                <div key={c.id} className="border rounded-md p-3">
+                  <div className="font-medium mb-2">{c.name}</div>
+                  <div className="grid md:grid-cols-2 gap-3 text-sm">
+                    <label className="flex items-center justify-between gap-3">
+                      <span>New offers</span>
+                      <Switch checked={!!prefs[c.id]?.newOffers} onCheckedChange={(v) => updatePref(c.id, 'newOffers', !!v)} disabled={saving !== null} />
+                    </label>
+                    <label className="flex items-center justify-between gap-3">
+                      <span>Booking reminders</span>
+                      <Switch checked={!!prefs[c.id]?.bookingReminders} onCheckedChange={(v) => updatePref(c.id, 'bookingReminders', !!v)} disabled={saving !== null} />
+                    </label>
+                    <label className="flex items-center justify-between gap-3">
+                      <span>Start/finish nudges</span>
+                      <Switch checked={!!prefs[c.id]?.startFinishNudges} onCheckedChange={(v) => updatePref(c.id, 'startFinishNudges', !!v)} disabled={saving !== null} />
+                    </label>
+                    <label className="flex items-center justify-between gap-3">
+                      <span>Daily email digest</span>
+                      <Switch checked={!!prefs[c.id]?.dailyEmail} onCheckedChange={(v) => updatePref(c.id, 'dailyEmail', !!v)} disabled={saving !== null} />
+                    </label>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Test Notifications</CardTitle>
+        </CardHeader>
+        <CardContent className="flex gap-2">
+          <Button variant="outline" onClick={triggerTestToasts}>Create Test Toasts</Button>
+          <Button onClick={triggerTestDigest}>Send Test Daily Email</Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

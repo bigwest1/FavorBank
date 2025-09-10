@@ -195,6 +195,10 @@ model User {
   businessSubscription BusinessSubscription?
   businessExpenses     BusinessExpense[]
   
+  // Notifications
+  notifications       Notification[]
+  notificationPrefs   NotificationPreference[]
+  
   @@map("users")
 }
 
@@ -426,6 +430,44 @@ model ErrandItem {
   @@index([bundleId])
   @@index([requesterId])
   @@map("errand_items")
+}
+
+// ==========================================
+// NOTIFICATIONS
+// ==========================================
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  circleId  String?  // Optional: circle context for the notification
+  type      String   // e.g., new_offer, booking_reminder, start_nudge, finish_nudge
+  read      Boolean  @default(false)
+  payload   Json?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([read])
+  @@map("Notification")
+}
+
+model NotificationPreference {
+  id                String  @id @default(cuid())
+  userId            String
+  circleId          String
+  newOffers         Boolean @default(true)
+  bookingReminders  Boolean @default(true)
+  startFinishNudges Boolean @default(true)
+  dailyEmail        Boolean @default(true)
+
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  circle            Circle  @relation(fields: [circleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, circleId])
+  @@index([circleId])
+  @@map("notification_prefs")
 }
 
 model LedgerEntry {

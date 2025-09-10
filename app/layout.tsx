@@ -4,6 +4,7 @@ import { Analytics } from "@vercel/analytics/react";
 import SessionProviderRoot from "@/components/providers/session-provider";
 import { UserMenu } from "@/components/auth/UserMenu";
 import "./globals.css";
+import { Toaster } from "@/components/ui/sonner";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -59,6 +60,7 @@ export default function RootLayout({
             {children}
           </main>
         </SessionProviderRoot>
+        <Toaster position="top-right" richColors />
         <Analytics />
       </body>
     </html>

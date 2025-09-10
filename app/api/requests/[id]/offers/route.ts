@@ -175,6 +175,24 @@ export async function POST(
       }
     });
 
+    // Notify request owner of new offer (respect basic pref default=true)
+    try {
+      await prisma.notification.create({
+        data: {
+          userId: requestData.userId,
+          type: 'new_offer',
+          payload: {
+            requestId: params.id,
+            offerId: offer.id,
+            helperName: offer.helper?.name,
+            message: `New offer for "${offer.request?.title ?? 'your request'}"`
+          }
+        }
+      });
+    } catch (e) {
+      console.warn('Failed to create notification for new offer', e);
+    }
+
     return NextResponse.json(offer);
   } catch (error: any) {
     if (error instanceof z.ZodError) {

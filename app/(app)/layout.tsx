@@ -6,6 +6,10 @@ import Logo from "@/components/brand/Logo";
 import { Bell, CircleDollarSign } from "lucide-react";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { cn } from "@/lib/utils";
+import { Toaster } from "@/components/ui/sonner";
+import dynamic from "next/dynamic";
+
+const NotificationsToaster = dynamic(() => import("@/components/notifications/NotificationsToaster"), { ssr: false });
 
 export default async function AppShellLayout({ children }: { children: ReactNode }) {
   const session = await auth();
@@ -74,6 +78,8 @@ export default async function AppShellLayout({ children }: { children: ReactNode
         </div>
       </header>
       <main className="container mx-auto container-page px-4 py-6">{children}</main>
+      <Toaster position="top-right" richColors />
+      <NotificationsToaster />
     </div>
   );
 }
