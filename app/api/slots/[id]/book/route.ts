@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
-import { escrowLock } from "@/lib/credits/ledger";
+import { escrowLock, insurancePremium } from "@/lib/credits/ledger";
 import { FeesContext } from "@/lib/fees/context";
 import { recordFeeSurcharge } from "@/lib/fees/ledger";
 
@@ -14,7 +14,8 @@ const BookSlotSchema = z.object({
     needsEquipment: z.boolean().optional(),
     isGuaranteed: z.boolean().optional(),
     crossCircle: z.boolean().optional()
-  }).optional()
+  }).optional(),
+  wantInsurance: z.boolean().optional()
 });
 
 export async function POST(
@@ -123,7 +124,13 @@ export async function POST(
     };
 
     const feeCalculation = FeesContext.calculateFees(baseCredits, bookingContext);
-    const totalCredits = feeCalculation.finalAmount;
+    
+    // Check if insurance is requested and eligible
+    const isInsuranceEligible = slot.category === "MOVING" || slot.category === "FURNITURE";
+    const wantInsurance = data.wantInsurance && isInsuranceEligible;
+    const insuranceCost = wantInsurance ? 2 : 0;
+    
+    const totalCredits = feeCalculation.finalAmount + insuranceCost;
 
     // Check if user has enough credits (including fees)
     if (membership.balanceCredits < totalCredits) {
@@ -147,7 +154,8 @@ export async function POST(
           duration: data.duration,
           totalCredits,
           bookerNotes: data.notes,
-          status: "CONFIRMED" // SlotShop bookings are auto-confirmed
+          status: "CONFIRMED", // SlotShop bookings are auto-confirmed
+          hasInsurance: wantInsurance
         }
       });
 
@@ -174,6 +182,16 @@ export async function POST(
         };
         
         await recordFeeSurcharge(feeContext, tx);
+      }
+
+      // Process insurance premium if selected
+      if (wantInsurance) {
+        await insurancePremium(tx, slot.circleId, session.user!.id, insuranceCost, {
+          bookingId: booking.id,
+          slotId: slot.id,
+          category: slot.category,
+          coverageAmount: 500 // Up to $500 coverage
+        });
       }
 
       // Escrow lock the credits (including fees)

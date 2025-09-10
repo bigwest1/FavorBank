@@ -51,6 +51,7 @@ export function BookingForm({ slot, onSuccess, onCancel }: BookingFormProps) {
   const [needsEquipment, setNeedsEquipment] = useState(false);
   const [isGuaranteed, setIsGuaranteed] = useState(false);
   const [crossCircle, setCrossCircle] = useState(false);
+  const [wantInsurance, setWantInsurance] = useState(false);
   
   const [feeCalculation, setFeeCalculation] = useState<any>(null);
 
@@ -64,7 +65,7 @@ export function BookingForm({ slot, onSuccess, onCancel }: BookingFormProps) {
   // Calculate fees whenever options change
   useEffect(() => {
     calculateFees();
-  }, [duration, isUrgent, needsEquipment, isGuaranteed, crossCircle]);
+  }, [duration, isUrgent, needsEquipment, isGuaranteed, crossCircle, wantInsurance]);
 
   const calculateFees = () => {
     const now = new Date();
@@ -92,6 +93,13 @@ export function BookingForm({ slot, onSuccess, onCancel }: BookingFormProps) {
 
     const calculation = FeesContext.calculateFees(baseAmount, bookingContext);
     const breakdown = FeesContext.getFeeBreakdown(calculation);
+    
+    // Add insurance cost if selected
+    if (wantInsurance && isInsuranceEligible()) {
+      breakdown.insuranceCost = 2;
+      breakdown.finalAmount += 2;
+    }
+    
     setFeeCalculation(breakdown);
   };
 
@@ -114,7 +122,8 @@ export function BookingForm({ slot, onSuccess, onCancel }: BookingFormProps) {
             needsEquipment,
             isGuaranteed,
             crossCircle
-          }
+          },
+          wantInsurance
         })
       });
 
@@ -152,6 +161,10 @@ export function BookingForm({ slot, onSuccess, onCancel }: BookingFormProps) {
   const isSpecializedCategory = () => {
     const specialized = ["TECH_SUPPORT", "TUTORING", "ELDERCARE", "CHILDCARE"];
     return specialized.includes(slot.category);
+  };
+
+  const isInsuranceEligible = () => {
+    return slot.category === "MOVING" || slot.category === "FURNITURE";
   };
 
   return (
@@ -312,6 +325,46 @@ export function BookingForm({ slot, onSuccess, onCancel }: BookingFormProps) {
         </CardContent>
       </Card>
 
+      {/* Insurance Add-on for eligible categories */}
+      {isInsuranceEligible() && (
+        <Card className="border-green-200 bg-green-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-green-800">
+              <Shield className="h-5 w-5" />
+              Damage Protection
+              <Badge variant="secondary" className="bg-green-100 text-green-700">
+                Optional
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-start space-x-3">
+              <Checkbox
+                id="insurance"
+                checked={wantInsurance}
+                onCheckedChange={(checked) => setWantInsurance(checked as boolean)}
+              />
+              <div className="flex-1">
+                <Label htmlFor="insurance" className="text-base font-medium text-green-800">
+                  Add damage protection up to $500 for $2?
+                </Label>
+                <p className="text-sm text-green-700 mt-1">
+                  Peace of mind for {slot.category.toLowerCase()} services. Covers accidental damage to your belongings up to $500.
+                </p>
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge variant="outline" className="text-xs border-green-300 text-green-700">
+                    +2 credits
+                  </Badge>
+                  <Badge variant="outline" className="text-xs border-green-300 text-green-700">
+                    Up to $500 coverage
+                  </Badge>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Fee Summary */}
       {feeCalculation && (
         <Card>
@@ -327,6 +380,15 @@ export function BookingForm({ slot, onSuccess, onCancel }: BookingFormProps) {
               finalAmount={feeCalculation.finalAmount}
               feeBreakdown={feeCalculation}
             />
+            
+            {feeCalculation.insuranceCost && (
+              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-green-700 font-medium">Damage Protection</span>
+                  <span className="text-green-800 font-semibold">+{feeCalculation.insuranceCost} credits</span>
+                </div>
+              </div>
+            )}
             
             {feeCalculation.fees.length > 0 && (
               <div className="mt-4">

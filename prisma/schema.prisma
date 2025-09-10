@@ -33,6 +33,8 @@ enum Category {
   CLEANING
   MAINTENANCE
   TRANSPORT
+  MOVING
+  FURNITURE
   CHILDCARE
   ELDERCARE
   TUTORING
@@ -279,6 +281,7 @@ model Booking {
   totalCredits  Int           // Total cost
   isGuaranteed  Boolean       @default(false) // New: Whether this booking is guaranteed
   guaranteedAt  DateTime?     // New: When the guarantee was applied
+  hasInsurance  Boolean       @default(false) // Whether insurance was purchased for this booking
   startTime     DateTime?     // Actual start time
   endTime       DateTime?     // Actual end time
   notes         String?       @db.Text
