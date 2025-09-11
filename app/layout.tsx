@@ -30,6 +30,10 @@ export const metadata: Metadata = {
   description: "A simple favor marketplace.",
 };
 
+// Ensure root layout is rendered dynamically to avoid build-time prerender
+// issues when environment or session context isn't available.
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({
   children,
 }: Readonly<{

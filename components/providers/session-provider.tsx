@@ -1,11 +1,8 @@
-"use server";
+"use client";
 import { ReactNode } from "react";
-import { auth } from "@/auth";
 import { SessionProvider } from "next-auth/react";
 
-export default async function SessionProviderRoot({ children }: { children: ReactNode }) {
-  const session = await auth();
-  // @ts-expect-error - next-auth types mismatch for server usage
-  return <SessionProvider session={session}>{children}</SessionProvider>;
+export default function SessionProviderRoot({ children }: { children: ReactNode }) {
+  // Client-only provider; session will be fetched on the client.
+  return <SessionProvider>{children}</SessionProvider>;
 }
-
